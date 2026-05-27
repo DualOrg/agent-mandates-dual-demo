@@ -2,12 +2,12 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import dualStatus from "./api/dual/status.js";
-import currentMandate from "./api/mandates/current.js";
-import syncMandate from "./api/mandates/sync.js";
-import mintMandate from "./api/mandates/mint.js";
+import dualStatus from "../api/dual/status.js";
+import currentMandate from "../api/mandates/current.js";
+import syncMandate from "../api/mandates/sync.js";
+import mintMandate from "../api/mandates/mint.js";
 
-const root = fileURLToPath(new URL(".", import.meta.url));
+const root = fileURLToPath(new URL("../", import.meta.url));
 await loadDotEnv();
 
 const port = Number(process.env.PORT || 4173);
