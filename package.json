@@ -1,0 +1,25 @@
+{
+  "name": "agent-mandates-dual-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DUAL-backed Agent Mandates cockpit demo",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check app.js && node --check server.mjs && node --check api/_dual.js && node --check api/dual/status.js && node --check api/mandates/current.js && node --check api/mandates/sync.js && node --check api/mandates/mint.js && node --check scripts/smoke-test.mjs",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "dual-sdk": "git+https://github.com/DualOrg/dual-sdk-ts.git"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DualOrg/agent-mandates-dual-demo.git"
+  },
+  "homepage": "https://agent-mandates-dual-demo.vercel.app",
+  "bugs": {
+    "url": "https://github.com/DualOrg/agent-mandates-dual-demo/issues"
+  },
+  "license": "UNLICENSED"
+}

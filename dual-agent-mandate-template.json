@@ -1,0 +1,73 @@
+{
+  "name": "io.dual.agent_mandate.demo.v1",
+  "description": "Operator-gated demo mandate for buyer-controlled AI agent commerce authority.",
+  "organization_id": "69b935b4187e903f826bbe71",
+  "object": {
+    "metadata": {
+      "name": "Agent Mandate Demo Object",
+      "description": "A DUAL-backed demo object for principal-bound agent authority, policy checks, revocation, and audit proof."
+    },
+    "custom": {
+      "mandate_id": "string",
+      "principal_wallet": "string",
+      "agent_wallet": "string",
+      "authority_scope": "string",
+      "jurisdiction": "string",
+      "status": "string",
+      "spend_limit_usd": "number",
+      "human_approval_required": "boolean",
+      "legal_verified": "boolean",
+      "policy_version": "number",
+      "policy_hash": "string",
+      "mandate_hash": "string",
+      "last_event_hash": "string",
+      "breach_count": "number",
+      "action_count": "number",
+      "last_decision_result": "string",
+      "last_decision_reason": "string",
+      "last_request_label": "string",
+      "last_request_amount_usd": "number",
+      "last_request_counterparty": "string",
+      "last_event_type": "string",
+      "last_event_status": "string",
+      "updated_at": "string"
+    }
+  },
+  "actions": [
+    {
+      "name": "mint",
+      "alias": "issue_agent_mandate_demo"
+    },
+    {
+      "name": "update",
+      "alias": "sync_agent_mandate_demo"
+    }
+  ],
+  "public_access": {
+    "custom": [
+      "mandate_id",
+      "principal_wallet",
+      "agent_wallet",
+      "authority_scope",
+      "jurisdiction",
+      "status",
+      "spend_limit_usd",
+      "human_approval_required",
+      "legal_verified",
+      "policy_version",
+      "policy_hash",
+      "mandate_hash",
+      "last_event_hash",
+      "breach_count",
+      "action_count",
+      "last_decision_result",
+      "last_decision_reason",
+      "last_request_label",
+      "last_request_amount_usd",
+      "last_request_counterparty",
+      "last_event_type",
+      "last_event_status",
+      "updated_at"
+    ]
+  }
+}
