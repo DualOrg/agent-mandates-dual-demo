@@ -1,5 +1,16 @@
 {
   "cleanUrls": true,
+  "functions": {
+    "server.mjs": {
+      "includeFiles": [
+        "index.html",
+        "client.js",
+        "styles.css",
+        "dual-agent-mandate-template.json",
+        "assets/**"
+      ]
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
