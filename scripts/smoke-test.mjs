@@ -34,6 +34,60 @@ const current = await request("/api/mandates/current");
 assert(current.response.ok, "current mandate endpoint degrades safely");
 assert(typeof current.body.available === "boolean", "current mandate endpoint reports availability");
 
+const allowedEvaluation = await request("/api/mandates/evaluate", {
+  method: "POST",
+  body: {
+    mandate: {
+      mandate_id: "mandate-agent-commerce-001",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      authority_scope: "buyer-agent-commerce",
+      jurisdiction: "AU-NSW",
+      status: "active",
+      spend_limit_usd: 250,
+      human_approval_required: true,
+      legal_verified: true
+    },
+    action: {
+      action_type: "purchase",
+      label: "Buy verified inventory token",
+      amount_usd: 175,
+      counterparty: "verified-seller.dual",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      jurisdiction: "AU-NSW"
+    }
+  }
+});
+assert(allowedEvaluation.response.ok, "evaluate endpoint returns 200");
+assert(allowedEvaluation.body.evaluation?.result === "Approved", "evaluate endpoint approves in-scope action");
+assert(allowedEvaluation.body.evaluation?.proof?.decision_hash, "evaluate endpoint returns a decision hash");
+assert(allowedEvaluation.body.publicWrites === false, "evaluate endpoint never enables public writes");
+
+const blockedEvaluation = await request("/api/mandates/evaluate", {
+  method: "POST",
+  body: {
+    mandate: {
+      mandate_id: "mandate-agent-commerce-001",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      authority_scope: "buyer-agent-commerce",
+      jurisdiction: "AU-NSW",
+      status: "active",
+      spend_limit_usd: 250,
+      human_approval_required: true,
+      legal_verified: true
+    },
+    action: {
+      action_type: "purchase",
+      label: "Buy inventory outside mandate",
+      amount_usd: 999,
+      counterparty: "unverified-seller.dual",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      jurisdiction: "AU-NSW"
+    }
+  }
+});
+assert(blockedEvaluation.response.ok, "evaluate endpoint returns blocked decision as 200");
+assert(blockedEvaluation.body.evaluation?.result === "Blocked", "evaluate endpoint blocks over-limit action");
+
 const rejectedSync = await request("/api/mandates/sync", {
   method: "POST",
   operatorToken: "wrong",

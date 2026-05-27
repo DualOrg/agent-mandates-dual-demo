@@ -4,6 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import dualStatus from "./api/dual/status.js";
 import currentMandate from "./api/mandates/current.js";
+import evaluateMandate from "./api/mandates/evaluate.js";
 import syncMandate from "./api/mandates/sync.js";
 import mintMandate from "./api/mandates/mint.js";
 
@@ -25,6 +26,7 @@ const mime = {
 const routes = new Map([
   ["GET /api/dual/status", dualStatus],
   ["GET /api/mandates/current", currentMandate],
+  ["POST /api/mandates/evaluate", evaluateMandate],
   ["POST /api/mandates/sync", syncMandate],
   ["POST /api/mandates/mint", mintMandate]
 ]);

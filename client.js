@@ -55,6 +55,14 @@ const initialState = {
     message: "Public simulation is local. DUAL writes require an operator token.",
     tone: "local",
     lastSyncAt: null
+  },
+  gate: {
+    result: "Not checked",
+    reason: "No external action evaluated",
+    source: "idle",
+    decisionHash: "",
+    objectId: "",
+    tone: "local"
   }
 };
 
@@ -83,6 +91,7 @@ function loadState() {
       request: { ...structuredClone(initialState.request), ...(parsed.request || {}) },
       lastDecision: { ...structuredClone(initialState.lastDecision), ...(parsed.lastDecision || {}) },
       dual: { ...structuredClone(initialState.dual), ...(parsed.dual || {}) },
+      gate: { ...structuredClone(initialState.gate), ...(parsed.gate || {}) },
       audit: Array.isArray(parsed.audit) ? parsed.audit : structuredClone(initialState.audit)
     };
   } catch {
@@ -283,6 +292,7 @@ async function render() {
   });
 
   renderDualStatus();
+  renderGateStatus();
 }
 
 function renderDualStatus() {
@@ -300,6 +310,16 @@ function renderDualStatus() {
   $("dualObjectId").textContent = current.id || status.objectId || "not linked";
   $("dualMessage").textContent = state.dual.message || initialState.dual.message;
   $("dualMessage").className = `dual-message ${tone}`;
+}
+
+function renderGateStatus() {
+  const tone = state.gate.tone || "local";
+  $("gateSource").textContent = state.gate.source || "idle";
+  $("gateDecision").textContent = state.gate.result || "Not checked";
+  $("gateReason").textContent = state.gate.reason || "No external action evaluated";
+  $("gateDecisionHash").textContent = shortHash(state.gate.decisionHash);
+  $("gateObjectId").textContent = state.gate.objectId || "not linked";
+  $("gateStrip").className = `decision-strip gate-strip ${tone === "block" ? "blocked" : tone === "review" ? "review" : ""}`;
 }
 
 async function saveMandate() {
@@ -341,6 +361,49 @@ async function simulateTransaction(forceBreach = false) {
   } else {
     state.lastDecision = { result: "Approved", reason: "Scope, jurisdiction, signature, and limit checks passed", tone: "ready" };
     addAudit("ok", "Transaction approved", `${state.selectedMode} request for ${formatUsd(amount)} with ${state.request.counterparty}.`);
+  }
+  await render();
+}
+
+async function evaluateExternalGate() {
+  syncFromInputs();
+  try {
+    const result = await apiJson("/api/mandates/evaluate", {
+      method: "POST",
+      body: {
+        action: {
+          action_type: state.selectedMode,
+          label: state.request.label,
+          amount_usd: Number(state.request.amount),
+          counterparty: state.request.counterparty,
+          agent_wallet: state.mandate.agentWallet,
+          jurisdiction: state.mandate.jurisdiction
+        },
+        mandate: mandateSnapshot()
+      }
+    });
+    const evaluation = result.evaluation || {};
+    const tone = evaluation.result === "Blocked" ? "block" : evaluation.result === "Requires approval" ? "review" : "ready";
+    state.gate = {
+      result: evaluation.result || "Evaluated",
+      reason: evaluation.reason || "Mandate gate returned a decision.",
+      source: evaluation.source || "request",
+      decisionHash: evaluation.proof?.decision_hash || "",
+      objectId: evaluation.proof?.object_id || "",
+      tone
+    };
+    state.lastDecision = {
+      result: state.gate.result,
+      reason: state.gate.reason,
+      tone
+    };
+  } catch (error) {
+    state.gate = {
+      ...state.gate,
+      result: "Gate error",
+      reason: error.message,
+      tone: "block"
+    };
   }
   await render();
 }
@@ -474,6 +537,7 @@ function wireEvents() {
   $("saveMandateBtn").addEventListener("click", saveMandate);
   $("simulateBtn").addEventListener("click", () => simulateTransaction(false));
   $("forceBreachBtn").addEventListener("click", () => simulateTransaction(true));
+  $("evaluateGateBtn").addEventListener("click", evaluateExternalGate);
   $("suspendBtn").addEventListener("click", suspendMandate);
   $("revokeBtn").addEventListener("click", revokeMandate);
   $("loadDualBtn").addEventListener("click", () => loadCurrentMandate({ applyToLocal: true }));

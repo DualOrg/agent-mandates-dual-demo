@@ -170,6 +170,30 @@
             </div>
           </section>
 
+          <section class="panel gate-panel">
+            <div class="section-head">
+              <h2>External Action Gate</h2>
+              <span class="small-metric" id="gateSource">idle</span>
+            </div>
+            <div class="gate-grid">
+              <div><span>Object</span><code id="gateObjectId">not linked</code></div>
+              <div><span>Decision hash</span><code id="gateDecisionHash">pending</code></div>
+            </div>
+            <div class="decision-strip gate-strip" id="gateStrip">
+              <div>
+                <span class="label">Decision</span>
+                <strong id="gateDecision">Not checked</strong>
+              </div>
+              <div>
+                <span class="label">Reason</span>
+                <strong id="gateReason">No external action evaluated</strong>
+              </div>
+              <div class="decision-actions">
+                <button class="primary-btn" id="evaluateGateBtn">Evaluate</button>
+              </div>
+            </div>
+          </section>
+
           <section class="panel verification-panel">
             <div class="section-head">
               <h2>Legal Verification</h2>

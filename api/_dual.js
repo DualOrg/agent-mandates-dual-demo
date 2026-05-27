@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export const defaultOrgId = "69b935b4187e903f826bbe71";
 export const templateName = "io.dual.agent_mandate.demo.v1";
 
@@ -193,6 +195,118 @@ export function normalizeMandateProperties(input = {}) {
   };
 }
 
+export function normalizeActionRequest(input = {}) {
+  return {
+    action_type: stringValue(input.action_type || input.type || input.mode, "purchase"),
+    label: stringValue(input.label || input.request_label || input.name, "Agent action request"),
+    amount_usd: numberValue(input.amount_usd ?? input.amount ?? input.notional_usd, 0),
+    counterparty: stringValue(input.counterparty || input.to || input.vendor, ""),
+    agent_wallet: stringValue(input.agent_wallet || input.agentWallet, ""),
+    jurisdiction: stringValue(input.jurisdiction, ""),
+    authority_scope: stringValue(input.authority_scope || input.scope, "")
+  };
+}
+
+export function evaluateMandateAction(properties, action, context = {}) {
+  const mandate = normalizeMandateProperties(properties);
+  const request = normalizeActionRequest(action);
+  const reasons = [];
+  const status = mandate.status.toLowerCase();
+  const actionType = request.action_type.toLowerCase().replaceAll("_", "-");
+  const amount = Number(request.amount_usd || 0);
+  const limit = Number(mandate.spend_limit_usd || 0);
+  let code = "approved";
+  let result = "Approved";
+  let allowed = true;
+
+  if (status !== "active") {
+    code = "inactive_mandate";
+    result = "Blocked";
+    allowed = false;
+    reasons.push(`Mandate status is ${mandate.status}.`);
+  }
+  if (request.agent_wallet && mandate.agent_wallet && request.agent_wallet !== mandate.agent_wallet) {
+    code = "agent_wallet_mismatch";
+    result = "Blocked";
+    allowed = false;
+    reasons.push("Request agent wallet does not match the mandate.");
+  }
+  if (request.jurisdiction && mandate.jurisdiction && request.jurisdiction !== mandate.jurisdiction) {
+    code = "jurisdiction_mismatch";
+    result = "Blocked";
+    allowed = false;
+    reasons.push(`Request jurisdiction ${request.jurisdiction} does not match ${mandate.jurisdiction}.`);
+  }
+  if (limit > 0 && amount > limit) {
+    code = "spend_limit_exceeded";
+    result = "Blocked";
+    allowed = false;
+    reasons.push(`Request amount ${amount} exceeds mandate limit ${limit}.`);
+  }
+  if (!scopeAllowsAction(mandate.authority_scope, actionType, request.label)) {
+    code = "scope_mismatch";
+    result = "Blocked";
+    allowed = false;
+    reasons.push(`${request.action_type} is outside ${mandate.authority_scope}.`);
+  }
+  if (!mandate.legal_verified) {
+    code = "legal_review_required";
+    result = "Blocked";
+    allowed = false;
+    reasons.push("Mandate legal verification is not active.");
+  }
+  if (allowed && mandate.human_approval_required && limit > 0 && amount > limit * 0.7) {
+    code = "human_approval_required";
+    result = "Requires approval";
+    allowed = false;
+    reasons.push("Near-threshold action requires human approval.");
+  }
+  if (!reasons.length) reasons.push("Scope, jurisdiction, status, and spend checks passed.");
+
+  const decisionHash = hashJson({
+    mandate_id: mandate.mandate_id,
+    action: request,
+    result,
+    code,
+    policy_hash: mandate.policy_hash,
+    mandate_hash: mandate.mandate_hash,
+    last_event_hash: mandate.last_event_hash
+  });
+
+  return {
+    allowed,
+    result,
+    code,
+    reason: reasons.join(" "),
+    source: context.source || "request",
+    action: request,
+    mandate: {
+      id: mandate.mandate_id,
+      status: mandate.status,
+      authority_scope: mandate.authority_scope,
+      jurisdiction: mandate.jurisdiction,
+      spend_limit_usd: mandate.spend_limit_usd,
+      human_approval_required: mandate.human_approval_required,
+      agent_wallet: mandate.agent_wallet
+    },
+    proof: {
+      object_id: context.object?.id || null,
+      template_id: context.object?.templateId || null,
+      state_hash: context.object?.stateHash || null,
+      integrity_hash: context.object?.integrityHash || null,
+      policy_hash: mandate.policy_hash,
+      mandate_hash: mandate.mandate_hash,
+      last_event_hash: mandate.last_event_hash,
+      decision_hash: decisionHash,
+      evaluated_at: new Date().toISOString()
+    }
+  };
+}
+
+export function hashJson(value) {
+  return createHash("sha256").update(JSON.stringify(sortObject(value))).digest("hex");
+}
+
 export function updatePayload(objectId, properties, metadata = {}) {
   return {
     action: {
@@ -325,4 +439,23 @@ function booleanValue(value, fallback) {
 
 function firstNonEmpty(...values) {
   return values.find((value) => value !== undefined && value !== null && value !== "") || null;
+}
+
+function scopeAllowsAction(scope, actionType, label = "") {
+  const normalizedScope = String(scope || "").toLowerCase();
+  const normalizedLabel = String(label || "").toLowerCase();
+  const allowedByScope = {
+    "buyer-agent-commerce": ["quote", "purchase", "transfer", "commerce", "commerce-purchase", "buy"],
+    "market-data-and-paper-execution": ["quote", "market-data", "paper-execution", "paper-trade", "trade-simulation"],
+    "credential-verification": ["verify", "credential-verification", "credential-verify"],
+    "procurement-quotes": ["quote", "procurement-quote", "rfq"]
+  };
+  const allowed = allowedByScope[normalizedScope] || [];
+  return allowed.some((item) => actionType === item || actionType.includes(item) || normalizedLabel.includes(item));
+}
+
+function sortObject(value) {
+  if (Array.isArray(value)) return value.map(sortObject);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortObject(value[key])]));
 }
