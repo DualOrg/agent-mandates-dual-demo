@@ -7,6 +7,7 @@ import currentMandate from "./api/mandates/current.js";
 import evaluateMandate from "./api/mandates/evaluate.js";
 import syncMandate from "./api/mandates/sync.js";
 import mintMandate from "./api/mandates/mint.js";
+import mcp from "./api/mcp.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 await loadDotEnv();
@@ -24,6 +25,12 @@ const mime = {
 };
 
 const routes = new Map([
+  ["GET /mcp", mcp],
+  ["POST /mcp", mcp],
+  ["OPTIONS /mcp", mcp],
+  ["GET /api/mcp", mcp],
+  ["POST /api/mcp", mcp],
+  ["OPTIONS /api/mcp", mcp],
   ["GET /api/dual/status", dualStatus],
   ["GET /api/mandates/current", currentMandate],
   ["POST /api/mandates/evaluate", evaluateMandate],
@@ -34,7 +41,7 @@ const routes = new Map([
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || `${host}:${port}`}`);
-    if (url.pathname.startsWith("/api/")) {
+    if (url.pathname === "/mcp" || url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
       return;
     }
@@ -67,10 +74,18 @@ async function handleApi(request, response, url) {
     body
   };
   const wrappedResponse = {
+    setHeader(name, value) {
+      response.setHeader(name, value);
+      return wrappedResponse;
+    },
     status(statusCode) {
       return {
         json(payload) {
           sendNodeJson(response, statusCode, payload);
+        },
+        end(payload = "") {
+          response.writeHead(statusCode);
+          response.end(payload);
         }
       };
     }

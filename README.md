@@ -52,6 +52,7 @@ Never expose the DUAL API key or operator token in browser code. The browser onl
 - `POST /api/mandates/evaluate` returns a read-only allow/block decision for a proposed agent action. It reads the canonical DUAL mandate when linked and never writes.
 - `POST /api/mandates/sync` updates the canonical mandate object. Requires `x-demo-operator-token`.
 - `POST /api/mandates/mint` mints a setup object. Requires `x-demo-operator-token`.
+- `POST /mcp` exposes a read-only MCP server for agents. It has no public write tools.
 
 Example external gate request:
 
@@ -60,6 +61,30 @@ curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/evaluate \
   -H 'content-type: application/json' \
   -d '{"action":{"action_type":"purchase","label":"Buy verified inventory token","amount_usd":175,"agent_wallet":"agent-mandates-demo-agent-wallet-001","jurisdiction":"AU-NSW"}}'
 ```
+
+## MCP
+
+Use the MCP endpoint when an agent should decide how to route a proposed action:
+
+```text
+https://agent-mandates-dual-demo.vercel.app/mcp
+```
+
+Read-only tools:
+
+- `agent_mandates_get_status` — readiness and safety state.
+- `agent_mandates_get_current` — canonical mandate object readback.
+- `agent_mandates_evaluate_action` — allow/block/human-escalation decision with DUAL proof hashes.
+
+Example MCP tool call:
+
+```bash
+curl -s https://agent-mandates-dual-demo.vercel.app/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"agent_mandates_evaluate_action","arguments":{"action":{"action_type":"purchase","label":"Buy verified inventory token","amount_usd":175,"agent_wallet":"agent-mandates-demo-agent-wallet-001","jurisdiction":"AU-NSW"}}}}'
+```
+
+The MCP surface intentionally does not expose `sync` or `mint`; live DUAL writes remain operator-gated through the existing HTTP endpoints only.
 
 ## Template
 

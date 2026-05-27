@@ -20,6 +20,26 @@ async function request(path, options = {}) {
   return { response, body };
 }
 
+async function mcp(method, params = {}) {
+  const result = await request("/mcp", {
+    method: "POST",
+    body: {
+      jsonrpc: "2.0",
+      id: `smoke-${method}`,
+      method,
+      params
+    }
+  });
+  assert(result.response.ok, `MCP ${method} returns HTTP 200`);
+  if (result.body.error) throw new Error(`MCP ${method} failed: ${result.body.error.message}`);
+  return result.body.result;
+}
+
+function mcpJson(toolResult) {
+  const text = toolResult?.content?.find((item) => item.type === "text")?.text;
+  return text ? JSON.parse(text) : toolResult?.structuredContent;
+}
+
 const home = await fetch(baseUrl);
 assert(home.ok, "home page loads");
 assert((await home.text()).includes("DUAL Agent Mandates"), "home page includes cockpit title");
@@ -87,6 +107,59 @@ const blockedEvaluation = await request("/api/mandates/evaluate", {
 });
 assert(blockedEvaluation.response.ok, "evaluate endpoint returns blocked decision as 200");
 assert(blockedEvaluation.body.evaluation?.result === "Blocked", "evaluate endpoint blocks over-limit action");
+
+const mcpInfo = await request("/mcp");
+assert(mcpInfo.response.ok, "MCP endpoint advertises itself over GET");
+assert(mcpInfo.body.safety?.readOnly === true, "MCP endpoint advertises read-only safety");
+
+const mcpInit = await mcp("initialize", {});
+assert(mcpInit.protocolVersion === "2025-06-18", "MCP initialize returns current protocol version");
+assert(mcpInit.serverInfo.name === "agent-mandates-dual-demo", "MCP initialize returns server name");
+
+const mcpTools = await mcp("tools/list", {});
+const mcpToolNames = mcpTools.tools.map((tool) => tool.name);
+assert(mcpToolNames.includes("agent_mandates_get_status"), "MCP exposes status tool");
+assert(mcpToolNames.includes("agent_mandates_get_current"), "MCP exposes current mandate tool");
+assert(mcpToolNames.includes("agent_mandates_evaluate_action"), "MCP exposes action evaluation tool");
+assert(mcpTools.tools.every((tool) => tool.annotations?.readOnlyHint === true), "MCP tools are read-only annotated");
+
+const mcpStatus = mcpJson(await mcp("tools/call", {
+  name: "agent_mandates_get_status",
+  arguments: {}
+}));
+assert(mcpStatus.safety?.publicWrites === false, "MCP status does not expose public writes");
+
+const mcpAllowed = mcpJson(await mcp("tools/call", {
+  name: "agent_mandates_evaluate_action",
+  arguments: {
+    mandate: {
+      mandate_id: "mandate-agent-commerce-001",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      authority_scope: "buyer-agent-commerce",
+      jurisdiction: "AU-NSW",
+      status: "active",
+      spend_limit_usd: 250,
+      human_approval_required: true,
+      legal_verified: true
+    },
+    action: {
+      action_type: "purchase",
+      label: "Buy verified inventory token",
+      amount_usd: 175,
+      counterparty: "verified-seller.dual",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      jurisdiction: "AU-NSW"
+    }
+  }
+}));
+assert(mcpAllowed.evaluation?.result === "Approved", "MCP evaluation approves in-scope action");
+assert(mcpAllowed.evaluation?.proof?.decision_hash, "MCP evaluation returns decision hash");
+assert(mcpAllowed.publicWrites === false, "MCP evaluation remains read-only");
+
+const mcpResources = await mcp("resources/list", {});
+assert(mcpResources.resources.some((resource) => resource.uri === "agent-mandates://current"), "MCP exposes current mandate resource");
+const currentResource = await mcp("resources/read", { uri: "agent-mandates://current" });
+assert(currentResource.contents?.[0]?.mimeType === "application/json", "MCP current resource returns JSON content");
 
 const rejectedSync = await request("/api/mandates/sync", {
   method: "POST",

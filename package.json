@@ -6,7 +6,7 @@
   "description": "DUAL-backed Agent Mandates cockpit demo",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check client.js && node --check server.mjs && node --check api/_dual.js && node --check api/dual/status.js && node --check api/mandates/current.js && node --check api/mandates/evaluate.js && node --check api/mandates/sync.js && node --check api/mandates/mint.js && node --check scripts/smoke-test.mjs",
+    "check": "node --check client.js && node --check server.mjs && node --check api/_dual.js && node --check api/dual/status.js && node --check api/mandates/current.js && node --check api/mandates/evaluate.js && node --check api/mandates/sync.js && node --check api/mandates/mint.js && node --check api/mcp.js && node --check scripts/smoke-test.mjs",
     "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
