@@ -11,9 +11,9 @@ const initialState = {
   },
   mandate: {
     id: "mandate-agent-commerce-001",
-    principalWallet: "0x2A976Bfa74Dd3212D93067708A32e3CE2bA58110",
-    agentWallet: "0xA61F7e4C7A2A9E53D73a41f0AA9870dE124b1081",
-    authorityScope: "market-data-and-paper-execution",
+    principalWallet: "69b92d49d5a95a6018672003",
+    agentWallet: "agent-mandates-demo-agent-wallet-001",
+    authorityScope: "buyer-agent-commerce",
     jurisdiction: "AU-NSW",
     limitUsd: 250,
     humanApproval: true,
@@ -39,7 +39,7 @@ const initialState = {
     {
       type: "ok",
       title: "Agent activated",
-      detail: "Scope limited to market data and paper execution.",
+      detail: "Scope limited to buyer-agent commerce.",
       at: "09:18:03"
     },
     {
