@@ -54,14 +54,49 @@ export async function dualClient() {
     error.status = 409;
     throw error;
   }
-  const { DualClient } = await import("dual-sdk");
-  return new DualClient({
-    baseUrl: config.apiUrl,
-    apiKey: config.apiKey,
-    token: config.apiKey,
-    authMode: "api_key",
-    timeout: 30000
+  try {
+    const { DualClient } = await import("dual-sdk");
+    return new DualClient({
+      baseUrl: config.apiUrl,
+      apiKey: config.apiKey,
+      token: config.apiKey,
+      authMode: "api_key",
+      timeout: 30000
+    });
+  } catch {
+    return directDualClient(config);
+  }
+}
+
+function directDualClient(config) {
+  return {
+    objects: {
+      get: (objectId) => dualRequest(config, "GET", `/objects/${encodeURIComponent(objectId)}`)
+    },
+    eventBus: {
+      execute: (payload) => dualRequest(config, "POST", "/ebus/execute", payload)
+    }
+  };
+}
+
+async function dualRequest(config, method, path, body) {
+  const response = await fetch(`${config.apiUrl.replace(/\/+$/, "")}${path}`, {
+    method,
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "x-api-key": config.apiKey
+    },
+    body: body === undefined ? undefined : JSON.stringify(body)
   });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.message || payload?.error || `DUAL request failed with HTTP ${response.status}`);
+    error.status = response.status;
+    error.body = payload;
+    throw error;
+  }
+  return payload;
 }
 
 export function requireOperator(request) {
