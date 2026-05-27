@@ -86,6 +86,14 @@ curl -s https://agent-mandates-dual-demo.vercel.app/mcp \
 
 The MCP surface intentionally does not expose `sync` or `mint`; live DUAL writes remain operator-gated through the existing HTTP endpoints only.
 
+For agent-side decision handling and canonical examples, see [Agent Usage](docs/agent-usage.md).
+
+Runnable harness:
+
+```bash
+npm run agent:harness
+```
+
 ## Template
 
 `dual-agent-mandate-template.json` defines `io.dual.agent_mandate.demo.v1` for IanTest (`69b935b4187e903f826bbe71`). It uses the v1 MVP fields: principal wallet, agent wallet, authority scope, jurisdiction, status, spend limit, human approval flag, policy/hash fields, event counts, last decision, last request, and timestamp.
