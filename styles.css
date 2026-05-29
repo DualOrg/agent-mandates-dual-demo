@@ -1285,7 +1285,7 @@ code {
   grid-template-columns: auto auto auto;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1500px) {
   .workspace {
     gap: 12px;
     grid-template-columns: minmax(250px, 0.85fr) minmax(500px, 1.55fr) minmax(300px, 0.95fr);
