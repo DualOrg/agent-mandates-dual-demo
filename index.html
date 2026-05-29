@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DUAL Agent Mandates</title>
-    <link rel="stylesheet" href="./styles.css?v=20260529-benchmark" />
+    <link rel="stylesheet" href="./styles.css?v=20260529-readwrite" />
   </head>
   <body>
     <div class="app-shell">
@@ -318,15 +318,37 @@
               </div>
             </div>
             <p class="readiness-note" id="dualMessage">Checking DUAL status endpoint...</p>
-            <div class="operator-row">
+            <div class="readwrite-console">
+              <div class="readwrite-status">
+                <div>
+                  <span>Read channel</span>
+                  <strong id="dualReadChannel">checking</strong>
+                </div>
+                <div>
+                  <span>Write channel</span>
+                  <strong id="dualWriteChannel">checking</strong>
+                </div>
+                <div>
+                  <span>Operator gate</span>
+                  <strong id="dualOperatorGate">checking</strong>
+                </div>
+              </div>
+              <div class="button-grid triple">
+                <button class="secondary-btn" id="refreshDualBtn">Refresh</button>
+                <button class="secondary-btn" id="loadDualBtn">Read DUAL</button>
+                <button class="secondary-btn" id="applyReadbackBtn">Apply readback</button>
+              </div>
               <label class="field">
                 <span>Operator token</span>
-                <input id="operatorToken" type="password" autocomplete="off" placeholder="Required for DUAL sync" />
+                <input id="operatorToken" type="password" autocomplete="off" placeholder="Required for sync or mint" />
               </label>
-              <div class="button-grid">
-                <button class="secondary-btn" id="loadDualBtn">Load DUAL</button>
-                <button class="primary-btn" id="syncDualBtn">Sync</button>
+              <div class="button-grid triple">
+                <button class="secondary-btn" id="previewWriteBtn">Preview</button>
+                <button class="primary-btn" id="syncDualBtn">Sync update</button>
+                <button class="danger-btn" id="mintDualBtn">Mint setup</button>
               </div>
+              <pre class="write-preview" id="writePreview">Read/write preview will appear here.</pre>
+              <div class="write-receipt" id="writeReceipt">No operator write executed in this browser session.</div>
             </div>
           </section>
 
@@ -428,6 +450,6 @@
         </div>
       </section>
     </div>
-    <script src="./client.js?v=20260529-benchmark"></script>
+    <script src="./client.js?v=20260529-readwrite"></script>
   </body>
 </html>

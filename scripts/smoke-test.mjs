@@ -54,6 +54,12 @@ const current = await request("/api/mandates/current");
 assert(current.response.ok, "current mandate endpoint degrades safely");
 assert(typeof current.body.available === "boolean", "current mandate endpoint reports availability");
 
+const writeReadiness = await request("/api/mandates/write-readiness");
+assert(writeReadiness.response.ok, "write readiness endpoint returns 200");
+assert(writeReadiness.body.write?.publicWrites === false, "write readiness reports no public writes");
+assert(writeReadiness.body.write?.exposedThroughMcp === false, "write readiness reports no MCP write exposure");
+assert(Array.isArray(writeReadiness.body.requirements), "write readiness reports requirements");
+
 const allowedEvaluation = await request("/api/mandates/evaluate", {
   method: "POST",
   body: {
@@ -107,6 +113,33 @@ const blockedEvaluation = await request("/api/mandates/evaluate", {
 });
 assert(blockedEvaluation.response.ok, "evaluate endpoint returns blocked decision as 200");
 assert(blockedEvaluation.body.evaluation?.result === "Blocked", "evaluate endpoint blocks over-limit action");
+
+const writePreview = await request("/api/mandates/preview", {
+  method: "POST",
+  body: {
+    action: "sync",
+    properties: {
+      mandate_id: "mandate-agent-commerce-001",
+      agent_wallet: "agent-mandates-demo-agent-wallet-001",
+      authority_scope: "buyer-agent-commerce",
+      jurisdiction: "AU-NSW",
+      status: "active",
+      spend_limit_usd: 250,
+      human_approval_required: true,
+      legal_verified: true
+    },
+    auditEvent: {
+      type: "ok",
+      title: "Smoke preview",
+      detail: "No write should execute."
+    }
+  }
+});
+assert(writePreview.response.ok, "write preview endpoint returns 200");
+assert(writePreview.body.writable === false, "write preview does not execute writes");
+assert(writePreview.body.publicWrites === false, "write preview reports no public writes");
+assert(writePreview.body.operatorTokenRequiredForExecution === true, "write preview requires operator token for execution");
+assert(writePreview.body.payloadPreview?.action?.update, "write preview returns update payload shape");
 
 const mcpInfo = await request("/mcp");
 assert(mcpInfo.response.ok, "MCP endpoint advertises itself over GET");
@@ -172,5 +205,17 @@ const rejectedSync = await request("/api/mandates/sync", {
   }
 });
 assert(rejectedSync.response.status === 403, "sync endpoint rejects missing or wrong operator token");
+
+const rejectedMint = await request("/api/mandates/mint", {
+  method: "POST",
+  operatorToken: "wrong",
+  body: {
+    properties: {
+      mandate_id: "mandate-agent-commerce-001",
+      status: "active"
+    }
+  }
+});
+assert(rejectedMint.response.status === 403, "mint endpoint rejects missing or wrong operator token");
 
 console.log("smoke test passed");

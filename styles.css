@@ -830,7 +830,7 @@ button svg {
   color: #f4fdff;
   display: grid;
   gap: 12px;
-  grid-template-columns: 0.72fr 1.25fr auto;
+  grid-template-columns: 1fr;
   margin-top: 2px;
   padding: 12px;
 }
@@ -856,8 +856,15 @@ button svg {
 
 .decision-actions {
   align-items: center;
-  display: flex;
+  display: grid;
   gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+
+.decision-actions .primary-btn,
+.decision-actions .danger-btn {
+  min-width: 0;
+  width: 100%;
 }
 
 .verifier-card {
@@ -941,7 +948,7 @@ button svg {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.operator-row {
+.readwrite-console {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 10px;
@@ -949,8 +956,68 @@ button svg {
   padding-top: 12px;
 }
 
-.operator-row .field {
+.readwrite-console .field {
   margin-bottom: 0;
+}
+
+.readwrite-status {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.readwrite-status div {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.readwrite-status span {
+  color: var(--muted);
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.readwrite-status strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.25;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.button-grid.triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.write-preview {
+  background: #121a1e;
+  border-radius: 8px;
+  color: #d9f6fb;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+  max-height: 220px;
+  min-height: 92px;
+  overflow: auto;
+  padding: 11px;
+  white-space: pre-wrap;
+}
+
+.write-receipt {
+  background: #eef8fa;
+  border: 1px solid rgba(32, 148, 162, 0.22);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 9px 10px;
 }
 
 .proof-object-strip {
@@ -1382,11 +1449,16 @@ code {
   .readiness-grid,
   .proof-object-strip,
   .proof-actions,
+  .readwrite-status,
   .reviewer-facts,
   .verifier-result,
   .decision-strip,
   .field-grid,
   .policy-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .button-grid.triple {
     grid-template-columns: 1fr;
   }
 

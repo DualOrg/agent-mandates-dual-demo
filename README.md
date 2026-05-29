@@ -22,7 +22,8 @@ What to look for:
 - `Mandate state`: the currently active mandate and policy boundary.
 - `Action verifier`: approve, block, or escalate proposed agent actions.
 - `Proof path`: mandate hash, policy hash, state hash, integrity hash, decision hash, and local proof bundle hash.
-- `DUAL readiness`: template, object, write mode, operator gate, and public-write status.
+- `DUAL readiness`: template, object, read channel, write channel, operator gate, and public-write status.
+- `Read/write console`: read canonical DUAL state, apply readback locally, preview event-bus payloads, and run operator-gated sync or mint.
 - `Audit log`: local demo events and operator-gated sync intent.
 
 For presenter and operator guidance, use:
@@ -69,6 +70,7 @@ No `.env` file is required for local mode. The app will:
 - Run the cockpit UI.
 - Evaluate actions against the local demo mandate.
 - Expose the read-only MCP facade.
+- Preview DUAL write payloads without executing them.
 - Keep DUAL writes disabled unless credentials and operator token are configured.
 
 If port `4173` is busy:
@@ -99,7 +101,8 @@ After the app opens:
 6. Confirm the decision is `Approved` or `Requires approval` depending on the selected action.
 7. Click `Generate proof bundle` and confirm a bundle hash appears in the proof rail.
 8. Try the oversized purchase scenario and confirm it is blocked before execution.
-9. Open `/mcp` or run the agent harness to verify the same read-only decision path is available to agents.
+9. Use the DUAL read/write console to read the canonical object or preview the sync payload.
+10. Open `/mcp` or run the agent harness to verify the same read-only decision path is available to agents.
 
 The approved action proves the happy path. The blocked action proves the mandate boundary.
 
@@ -143,7 +146,7 @@ DEMO_BASE_URL=https://agent-mandates-dual-demo.vercel.app npm run smoke
 MCP_URL=https://agent-mandates-dual-demo.vercel.app/mcp npm run agent:harness
 ```
 
-The smoke test checks the home page, status route, current mandate readback, read-only evaluation path, MCP initialize/tools/resources, and wrong-token `403` behavior on operator sync.
+The smoke test checks the home page, status route, current mandate readback, read/write readiness, write preview, read-only evaluation path, MCP initialize/tools/resources, and wrong-token `403` behavior on operator sync/mint.
 
 ## Modes
 
@@ -208,7 +211,9 @@ Important:
 10. Verify:
     - `GET /api/dual/status`
     - `GET /api/mandates/current`
+    - `GET /api/mandates/write-readiness`
     - `POST /api/mandates/evaluate`
+    - `POST /api/mandates/preview`
     - `GET /mcp`
     - MCP `initialize`
     - MCP `tools/list`
@@ -219,6 +224,7 @@ Important:
 ```bash
 curl https://agent-mandates-dual-demo.vercel.app/api/dual/status
 curl https://agent-mandates-dual-demo.vercel.app/api/mandates/current
+curl https://agent-mandates-dual-demo.vercel.app/api/mandates/write-readiness
 curl https://agent-mandates-dual-demo.vercel.app/mcp
 ```
 
@@ -235,7 +241,9 @@ Useful endpoints:
 ```text
 GET  /api/dual/status
 GET  /api/mandates/current
+GET  /api/mandates/write-readiness
 POST /api/mandates/evaluate
+POST /api/mandates/preview   no write; payload preview only
 POST /api/mandates/sync      operator token required
 POST /api/mandates/mint      operator token required
 GET  /mcp
@@ -339,6 +347,23 @@ The app keeps human-facing DUAL links and proof/search links where the public ro
 
 The current public v1 proof rail is readback and verifier focused. It does not claim an L1 roll-up transaction for every evaluation. Operator-gated sync events may create DUAL event-bus action evidence; public evaluation does not write.
 
+## DUAL Read/Write Console
+
+The app includes a DUAL read/write console in the right rail:
+
+| Control | What it does | Writes |
+| --- | --- | --- |
+| `Refresh` | Reloads public status and write-readiness. | No |
+| `Read DUAL` | Reads the canonical mandate object. | No |
+| `Apply readback` | Copies loaded DUAL object values into the local cockpit controls. | No |
+| `Preview` | Builds the event-bus update payload that would be sent. | No |
+| `Sync update` | Updates the canonical DUAL mandate object. | Yes, operator token required |
+| `Mint setup` | Mints a setup mandate object. Use only when no canonical object exists. | Yes, operator token required |
+
+The preview route does not require the operator token because it does not execute a write. It exists so reviewers and operators can inspect the exact payload shape before approving a write.
+
+The sync and mint routes require a browser confirmation and a valid `DEMO_OPERATOR_TOKEN`. The operator token is not stored in local state.
+
 ## Safety Rules
 
 - Public users can simulate, evaluate, verify, and generate local proof bundles.
@@ -358,6 +383,7 @@ The current public v1 proof rail is readback and verifier focused. It does not c
 | Port `4173` is busy | Another local server is running. | Start with `PORT=4174 npm start`. |
 | UI shows local mode | `DUAL_PERSISTENCE_MODE=local` or missing DUAL readback credentials. | Configure DUAL env vars only when live readback is needed. |
 | `/api/dual/status` says readback is missing | Missing `DUAL_API_KEY` or `DUAL_AGENT_MANDATE_OBJECT_ID`. | Set server-side env vars and redeploy. |
+| Preview works but sync fails | Preview is read-only; execution still needs write readiness and operator token. | Check `/api/mandates/write-readiness`. |
 | Operator sync returns `403` | Missing or wrong `x-demo-operator-token` / bearer token. | Use the server-side configured operator token only for approved sync. |
 | Operator sync returns `409` | Write mode, template id, object id, API key, or operator token is incomplete. | Check `/api/dual/status` and `DUAL_WRITE_MODE=event_bus`. |
 | MCP client expects write tools | This MCP is intentionally read-only. | Use HTTP operator endpoints only for approved setup/sync. |

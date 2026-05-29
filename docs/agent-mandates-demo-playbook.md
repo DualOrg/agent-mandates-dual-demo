@@ -59,6 +59,7 @@ The production demo is DUAL-backed for readback and operator-gated for writes. T
 - no write-capable MCP tools;
 - no DUAL API key in the browser;
 - no live sync on page load;
+- write preview available without mutation;
 - wrong operator token returns `403`;
 - evaluation returns decision hashes and readback identifiers.
 
@@ -297,9 +298,11 @@ Other block paths:
 Current public read/proof path:
 
 - Reads DUAL readiness.
+- Reads DUAL read/write readiness.
 - Reads the canonical mandate object when configured.
 - Evaluates proposed actions against readback state.
 - Returns decision hashes and readback identifiers.
+- Previews the event-bus payload that would be sent for sync/mint.
 - Lets users generate a local proof bundle.
 
 Operator-gated write path:
@@ -311,7 +314,19 @@ Operator-gated write path:
 
 Important distinction:
 
-> Public evaluation is not a DUAL write. Operator-gated sync is the only write-capable path in v1.
+> Public readback, evaluation, and payload preview are not DUAL writes. Operator-gated sync and mint are the only write-capable paths in v1.
+
+Detailed read/write map:
+
+| Surface | Direction | Current status | Demo role |
+| --- | --- | --- | --- |
+| DUAL readiness | Read | Public | Shows whether read/write config is present. |
+| Mandate object | Read | Public when configured | Loads canonical mandate state. |
+| Evaluator | Read/evaluate | Public | Produces decision and proof hash. |
+| Payload preview | Preview | Public, no mutation | Shows the exact event-bus payload shape. |
+| Mandate sync | Write | Operator-gated | Updates canonical object after approval. |
+| Mandate mint | Write | Operator-gated setup only | Seeds a new object when object id is absent. |
+| MCP | Read/evaluate | Public | Gives agents the same decision path, with no write tools. |
 
 ## 8. Objection Handling
 
@@ -334,6 +349,7 @@ Important distinction:
 | Evaluation returns `Requires approval` | Explain the human approval threshold and route to human escalation. |
 | Proof bundle hash is missing | Click `Generate proof bundle` after an evaluation. |
 | DUAL readback is unavailable | Use the local demo path and point reviewers to `/api/dual/status`. |
+| Preview works but sync fails | Explain that preview is intentionally public and non-writing; sync needs operator approval and server-side readiness. |
 | MCP client cannot find write tools | Correct behavior. This MCP is intentionally read-only. |
 | Audience asks for enforcement | Reframe: v1 proves pre-action authority checks; downstream tool integration is where enforcement attaches. |
 

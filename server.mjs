@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 import dualStatus from "./api/dual/status.js";
 import currentMandate from "./api/mandates/current.js";
 import evaluateMandate from "./api/mandates/evaluate.js";
+import previewMandate from "./api/mandates/preview.js";
 import syncMandate from "./api/mandates/sync.js";
 import mintMandate from "./api/mandates/mint.js";
+import writeReadiness from "./api/mandates/write-readiness.js";
 import mcp from "./api/mcp.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -33,7 +35,9 @@ const routes = new Map([
   ["OPTIONS /api/mcp", mcp],
   ["GET /api/dual/status", dualStatus],
   ["GET /api/mandates/current", currentMandate],
+  ["GET /api/mandates/write-readiness", writeReadiness],
   ["POST /api/mandates/evaluate", evaluateMandate],
+  ["POST /api/mandates/preview", previewMandate],
   ["POST /api/mandates/sync", syncMandate],
   ["POST /api/mandates/mint", mintMandate]
 ]);

@@ -17,6 +17,7 @@ Point to the top status chips:
 - `Operator gated`: write-capable routes exist only for approved operators.
 - `DUAL readback`: the canonical mandate object is configured.
 - `publicWrites=false`: public users and public MCP clients cannot write.
+- `Read/write console`: public preview is allowed; sync and mint require an operator token.
 
 ## Run The Authority Check
 
@@ -34,6 +35,7 @@ Point to the top status chips:
    - decision hash.
 5. Click `Generate proof bundle`.
 6. Confirm the proof bundle hash appears in the proof rail.
+7. Click `Preview` in the DUAL read/write console to inspect the update payload without writing.
 
 Presenter line:
 
@@ -155,6 +157,12 @@ Current mandate:
 curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/current
 ```
 
+Read/write readiness:
+
+```bash
+curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/write-readiness
+```
+
 Evaluate:
 
 ```bash
@@ -163,10 +171,29 @@ curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/evaluate \
   -d '{"action":{"action_type":"purchase","label":"Buy verified inventory token","amount_usd":175,"counterparty":"verified-seller.dual","agent_wallet":"agent-mandates-demo-agent-wallet-001","jurisdiction":"AU-NSW"}}'
 ```
 
+Preview the DUAL update payload:
+
+```bash
+curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/preview \
+  -H 'content-type: application/json' \
+  -d '{"action":"sync","properties":{"mandate_id":"mandate-agent-commerce-001","status":"active"}}'
+```
+
 Wrong-token write rejection:
 
 ```bash
 curl -i https://agent-mandates-dual-demo.vercel.app/api/mandates/sync \
+  -H 'content-type: application/json' \
+  -H 'x-demo-operator-token: wrong' \
+  -d '{"properties":{"mandate_id":"mandate-agent-commerce-001","status":"active"}}'
+```
+
+Expected: `403`.
+
+Wrong-token mint rejection:
+
+```bash
+curl -i https://agent-mandates-dual-demo.vercel.app/api/mandates/mint \
   -H 'content-type: application/json' \
   -H 'x-demo-operator-token: wrong' \
   -d '{"properties":{"mandate_id":"mandate-agent-commerce-001","status":"active"}}'
@@ -216,11 +243,11 @@ Expected:
 
 ## L3/L2/L1 Positioning
 
-Do not claim a public evaluation created a new L3 action, L2 batch, or L1 roll-up. Public evaluation is read-only.
+Do not claim a public evaluation created a new L3 action, L2 batch, or L1 roll-up. Public evaluation and preview are read-only.
 
 Use this language:
 
-> In v1, the public proof path is DUAL readback plus local decision proof. Operator-gated sync can create DUAL event-bus evidence, but public evaluation and MCP calls do not write.
+> In v1, the public proof path is DUAL readback plus local decision proof. Public preview shows what would be written. Operator-gated sync can create DUAL event-bus evidence, but public evaluation, preview, and MCP calls do not write.
 
 If an operator-approved sync has been performed for a specific run, add the resulting action/batch identifiers to this run sheet before presenting them.
 

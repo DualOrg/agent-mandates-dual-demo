@@ -51,6 +51,7 @@ Update docs when behavior changes:
 - MCP harness passes.
 - No secrets are present in changed files.
 - Public status still reports `publicWrites=false`.
+- Write preview still reports `writable=false`.
 - Wrong operator token still returns `403`.
 - README/docs match the implemented behavior.
 

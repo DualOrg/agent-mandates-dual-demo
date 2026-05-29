@@ -116,10 +116,12 @@ It exposes status, current mandate readback, and evaluation only. It does not ex
 4. Deploy and verify `GET /api/dual/status`.
 5. Confirm `publicWrites=false` and `operatorGateConfigured=true` if write mode is configured.
 6. Verify `GET /api/mandates/current` returns the canonical object or a clear readiness message.
-7. Verify `POST /api/mandates/evaluate` returns a decision hash without writing.
-8. Verify `GET /mcp`, MCP `initialize`, MCP `tools/list`, and `agent_mandates_evaluate_action`.
-9. Verify wrong-token `POST /api/mandates/sync` returns `403`.
-10. Perform an operator sync only when explicitly approved for that run.
+7. Verify `GET /api/mandates/write-readiness` reports read/write capability without secrets.
+8. Verify `POST /api/mandates/evaluate` returns a decision hash without writing.
+9. Verify `POST /api/mandates/preview` returns an event-bus payload preview without writing.
+10. Verify `GET /mcp`, MCP `initialize`, MCP `tools/list`, and `agent_mandates_evaluate_action`.
+11. Verify wrong-token `POST /api/mandates/sync` and `POST /api/mandates/mint` return `403`.
+12. Perform an operator sync only when explicitly approved for that run.
 
 ## API and MCP Checks
 
@@ -135,12 +137,26 @@ Current mandate:
 curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/current
 ```
 
+Read/write readiness:
+
+```bash
+curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/write-readiness
+```
+
 Read-only evaluator:
 
 ```bash
 curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/evaluate \
   -H 'content-type: application/json' \
   -d '{"action":{"action_type":"purchase","label":"Buy verified inventory token","amount_usd":175,"counterparty":"verified-seller.dual","agent_wallet":"agent-mandates-demo-agent-wallet-001","jurisdiction":"AU-NSW"}}'
+```
+
+Write payload preview:
+
+```bash
+curl -s https://agent-mandates-dual-demo.vercel.app/api/mandates/preview \
+  -H 'content-type: application/json' \
+  -d '{"action":"sync","properties":{"mandate_id":"mandate-agent-commerce-001","status":"active"}}'
 ```
 
 MCP initialize:
@@ -165,7 +181,9 @@ The public contract is:
 - HTTP status/readback/evaluation routes are safe for public inspection.
 - MCP is safe for public agent clients because it is read-only.
 - Public evaluation can return DUAL readback identifiers and hashes.
+- Public preview can return the would-be DUAL event-bus payload.
 - Public evaluation never mutates DUAL state.
+- Public preview never mutates DUAL state.
 - Operator endpoints are present for setup and approved sync only.
 
 ## Troubleshooting
@@ -175,6 +193,7 @@ The public contract is:
 | `readbackReady=false` | Check `DUAL_API_KEY` and `DUAL_AGENT_MANDATE_OBJECT_ID`. |
 | `writable=false` in production | Confirm this is intended. If not, check `DUAL_WRITE_MODE=event_bus`, `DEMO_OPERATOR_TOKEN`, template id, object id, and API key. |
 | `/api/mandates/current` returns unavailable | Treat as local/read-only demo state; do not imply live object proof. |
+| `/api/mandates/preview` works but sync fails | Expected when the write gate is not ready. Preview is read-only. |
 | MCP returns no write tools | Correct behavior. This MCP is intentionally read-only. |
 | Operator sync returns `403` | Wrong token or missing token. Do not retry with guessed values. |
 | Operator sync returns `409` | Write readiness is incomplete. Inspect `/api/dual/status`. |
@@ -186,6 +205,7 @@ Do not enable public DUAL writes for this repo. The intended public pattern is:
 
 ```text
 read -> evaluate -> verify -> generate local proof bundle
+read -> preview DUAL write payload
 ```
 
 The operator pattern is:

@@ -57,10 +57,14 @@ const initialState = {
   ],
   dual: {
     status: null,
+    writeReadiness: null,
     current: null,
     message: "Public simulation is local. DUAL writes require an operator token.",
     tone: "local",
-    lastSyncAt: null
+    lastSyncAt: null,
+    lastReadAt: null,
+    writePreview: null,
+    lastWrite: null
   },
   gate: {
     result: "Not checked",
@@ -438,6 +442,7 @@ function renderPathMap() {
 function renderDualStatus() {
   const status = state.dual.status || {};
   const current = state.dual.current || {};
+  const readiness = state.dual.writeReadiness || {};
   const readReady = Boolean(status.readbackReady || current.id);
   const writeReady = Boolean(status.writable);
   const tone = state.dual.tone || (writeReady ? "active" : readReady ? "review" : "local");
@@ -448,8 +453,23 @@ function renderDualStatus() {
   $("dualOrg").textContent = shortValue(status.orgId || "pending", 12, 6);
   $("dualReadiness").textContent = readReady ? "configured" : "not linked";
   $("dualWriteReadiness").textContent = writeReady ? "event-bus gated" : "disabled";
+  $("dualReadChannel").textContent = readiness.read?.enabled || readReady
+    ? `read ${state.dual.lastReadAt ? `at ${state.dual.lastReadAt}` : "ready"}`
+    : "local preview";
+  $("dualWriteChannel").textContent = readiness.write?.enabled || writeReady
+    ? "event_bus gated"
+    : readiness.write?.mode || status.writeMode || "read_only";
+  $("dualOperatorGate").textContent = readiness.write?.operatorGateConfigured || status.operatorGateConfigured
+    ? "configured"
+    : "missing";
   $("dualMessage").textContent = state.dual.message || initialState.dual.message;
   $("dualMessage").className = `readiness-note ${tone}`;
+  $("writePreview").textContent = state.dual.writePreview
+    ? JSON.stringify(state.dual.writePreview, null, 2)
+    : "Read/write preview will appear here.";
+  $("writeReceipt").textContent = state.dual.lastWrite
+    ? `${state.dual.lastWrite.action} ${state.dual.lastWrite.status} at ${state.dual.lastWrite.at}${state.dual.lastWrite.objectId ? ` for ${state.dual.lastWrite.objectId}` : ""}`
+    : "No operator write executed in this browser session.";
 }
 
 function renderGateStatus() {
@@ -740,8 +760,12 @@ async function revokeMandate() {
 
 async function loadDualStatus() {
   try {
-    const status = await apiJson("/api/dual/status");
+    const [status, writeReadiness] = await Promise.all([
+      apiJson("/api/dual/status"),
+      apiJson("/api/mandates/write-readiness")
+    ]);
     state.dual.status = status;
+    state.dual.writeReadiness = writeReadiness;
     state.dual.message = status.detail || (status.readbackReady ? "DUAL readback is configured." : "DUAL is not configured for this deployment yet.");
     state.dual.tone = status.writable ? "active" : status.readbackReady ? "review" : "local";
   } catch (error) {
@@ -755,6 +779,7 @@ async function loadCurrentMandate({ applyToLocal = false } = {}) {
   try {
     const current = await apiJson("/api/mandates/current");
     state.dual.current = current.object || current;
+    state.dual.lastReadAt = nowStamp();
     state.dual.message = current.available ? "DUAL mandate readback loaded." : current.reason || "No DUAL mandate object is linked.";
     state.dual.tone = current.available ? "review" : "local";
     if (applyToLocal && current.properties) applyMandateProperties(current.properties);
@@ -765,13 +790,72 @@ async function loadCurrentMandate({ applyToLocal = false } = {}) {
   await render();
 }
 
+async function applyCurrentReadback() {
+  if (!state.dual.current?.properties) {
+    await loadCurrentMandate({ applyToLocal: true });
+    return;
+  }
+  applyMandateProperties(state.dual.current.properties);
+  addAudit("ok", "DUAL readback applied", "Local mandate controls now match the latest loaded DUAL object.");
+  state.dual.message = "Loaded DUAL readback applied to the local cockpit.";
+  state.dual.tone = "review";
+  await render();
+}
+
+async function previewDualWrite(action = "sync") {
+  syncFromInputs();
+  await refreshHashes();
+  try {
+    const result = await apiJson("/api/mandates/preview", {
+      method: "POST",
+      body: {
+        action,
+        properties: mandateSnapshot(),
+        auditEvent: state.audit[0] || null
+      }
+    });
+    state.dual.writePreview = {
+      action: result.action,
+      target: result.target,
+      writable: result.writable,
+      operatorTokenRequiredForExecution: result.operatorTokenRequiredForExecution,
+      publicWrites: result.publicWrites,
+      payloadPreview: result.payloadPreview
+    };
+    state.dual.message = `${action === "mint" ? "Mint" : "Sync"} payload preview generated. No DUAL write was executed.`;
+    state.dual.tone = "review";
+  } catch (error) {
+    state.dual.message = `DUAL write preview failed: ${error.message}`;
+    state.dual.tone = "block";
+  }
+  await render();
+}
+
 async function syncMandateToDual() {
   syncFromInputs();
   await refreshHashes();
-  const operatorToken = $("operatorToken").value.trim();
+  const operatorToken = operatorTokenValue();
   if (!operatorToken) {
     state.dual.message = "Enter the operator token before syncing to DUAL.";
     state.dual.tone = "block";
+    state.dual.lastWrite = {
+      action: "sync",
+      status: "blocked",
+      objectId: proofObjectId(),
+      at: nowStamp()
+    };
+    await render();
+    return;
+  }
+  if (!confirm("This will perform an operator-gated DUAL event-bus update for the canonical mandate object. Continue?")) {
+    state.dual.message = "DUAL sync cancelled before write.";
+    state.dual.tone = "review";
+    state.dual.lastWrite = {
+      action: "sync",
+      status: "cancelled",
+      objectId: proofObjectId(),
+      at: nowStamp()
+    };
     await render();
     return;
   }
@@ -787,15 +871,97 @@ async function syncMandateToDual() {
     });
     state.dual.lastSyncAt = new Date().toISOString();
     state.dual.current = result.object || state.dual.current;
+    state.dual.lastWrite = {
+      action: "sync",
+      status: "accepted",
+      objectId: result.object?.id || proofObjectId(),
+      at: nowStamp()
+    };
     state.dual.message = result.synced ? "Mandate snapshot synced to DUAL." : "DUAL sync completed.";
     state.dual.tone = "active";
     addAudit("ok", "DUAL sync completed", result.object?.id ? `Object ${result.object.id} updated.` : "Operator-gated DUAL write accepted.");
+    $("operatorToken").value = "";
     await loadCurrentMandate();
   } catch (error) {
     state.dual.message = `DUAL sync failed: ${error.message}`;
     state.dual.tone = "block";
+    state.dual.lastWrite = {
+      action: "sync",
+      status: "failed",
+      objectId: proofObjectId(),
+      at: nowStamp()
+    };
     await render();
   }
+}
+
+async function mintMandateInDual() {
+  syncFromInputs();
+  await refreshHashes();
+  const operatorToken = operatorTokenValue();
+  if (!operatorToken) {
+    state.dual.message = "Enter the operator token before minting a DUAL mandate object.";
+    state.dual.tone = "block";
+    state.dual.lastWrite = {
+      action: "mint",
+      status: "blocked",
+      objectId: "",
+      at: nowStamp()
+    };
+    await render();
+    return;
+  }
+  if (!confirm("This will perform an operator-gated DUAL event-bus mint. Use only for setup when no canonical object exists. Continue?")) {
+    state.dual.message = "DUAL mint cancelled before write.";
+    state.dual.tone = "review";
+    state.dual.lastWrite = {
+      action: "mint",
+      status: "cancelled",
+      objectId: "",
+      at: nowStamp()
+    };
+    await render();
+    return;
+  }
+
+  try {
+    const result = await apiJson("/api/mandates/mint", {
+      method: "POST",
+      operatorToken,
+      body: {
+        properties: mandateSnapshot(),
+        auditEvent: state.audit[0] || null
+      }
+    });
+    state.dual.lastSyncAt = new Date().toISOString();
+    state.dual.current = result.object || state.dual.current;
+    state.dual.lastWrite = {
+      action: "mint",
+      status: "accepted",
+      objectId: result.object?.id || "",
+      at: nowStamp()
+    };
+    state.dual.message = result.synced ? "Mandate object minted in DUAL." : "DUAL mint completed.";
+    state.dual.tone = "active";
+    addAudit("ok", "DUAL mint completed", result.object?.id ? `Object ${result.object.id} minted.` : "Operator-gated DUAL mint accepted.");
+    $("operatorToken").value = "";
+    await loadDualStatus();
+    await render();
+  } catch (error) {
+    state.dual.message = `DUAL mint failed: ${error.message}`;
+    state.dual.tone = "block";
+    state.dual.lastWrite = {
+      action: "mint",
+      status: "failed",
+      objectId: "",
+      at: nowStamp()
+    };
+    await render();
+  }
+}
+
+function operatorTokenValue() {
+  return $("operatorToken").value.trim();
 }
 
 async function apiJson(path, options = {}) {
@@ -821,8 +987,8 @@ function applyMandateProperties(properties) {
   state.mandate.jurisdiction = stringValue(properties.jurisdiction, state.mandate.jurisdiction);
   state.mandate.state = stringValue(properties.status, state.mandate.state);
   state.mandate.limitUsd = Number(properties.spend_limit_usd || state.mandate.limitUsd);
-  state.mandate.humanApproval = Boolean(properties.human_approval_required ?? state.mandate.humanApproval);
-  state.mandate.legalVerified = Boolean(properties.legal_verified ?? state.mandate.legalVerified);
+  state.mandate.humanApproval = coerceBoolean(properties.human_approval_required, state.mandate.humanApproval);
+  state.mandate.legalVerified = coerceBoolean(properties.legal_verified, state.mandate.legalVerified);
   state.mandate.policyVersion = Number(properties.policy_version || state.mandate.policyVersion);
   state.request.label = stringValue(properties.last_request_label, state.request.label);
   state.request.amount = Number(properties.last_request_amount_usd || state.request.amount);
@@ -834,6 +1000,13 @@ function applyMandateProperties(properties) {
 
 function stringValue(value, fallback) {
   return typeof value === "string" && value ? value : fallback;
+}
+
+function coerceBoolean(value, fallback) {
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
 }
 
 function escapeHtml(value) {
@@ -922,8 +1095,12 @@ function wireEvents() {
   $("reviewerCloseBtn").addEventListener("click", closeReviewerMode);
   $("suspendBtn").addEventListener("click", suspendMandate);
   $("revokeBtn").addEventListener("click", revokeMandate);
-  $("loadDualBtn").addEventListener("click", () => loadCurrentMandate({ applyToLocal: true }));
+  $("refreshDualBtn").addEventListener("click", loadDualStatus);
+  $("loadDualBtn").addEventListener("click", () => loadCurrentMandate({ applyToLocal: false }));
+  $("applyReadbackBtn").addEventListener("click", applyCurrentReadback);
+  $("previewWriteBtn").addEventListener("click", () => previewDualWrite("sync"));
   $("syncDualBtn").addEventListener("click", syncMandateToDual);
+  $("mintDualBtn").addEventListener("click", mintMandateInDual);
   $("resetBtn").addEventListener("click", async () => {
     state = structuredClone(initialState);
     bindInputs();
