@@ -14,7 +14,10 @@ export function dualConfig() {
     templateId: process.env.DUAL_AGENT_MANDATE_TEMPLATE_ID || "",
     objectId: process.env.DUAL_AGENT_MANDATE_OBJECT_ID || "",
     apiKey: process.env.DUAL_API_KEY || "",
-    operatorToken: process.env.DEMO_OPERATOR_TOKEN || ""
+    operatorToken: process.env.DEMO_OPERATOR_TOKEN || "",
+    consoleBaseUrl: process.env.DUAL_CONSOLE_BASE_URL || "https://console-testnet.dual.network",
+    l3ExplorerBaseUrl: process.env.DUAL_L3_EXPLORER_BASE_URL || "https://explorer-testnet.dual.network",
+    l2ExplorerBaseUrl: process.env.DUAL_L2_EXPLORER_BASE_URL || "https://explorer-test-v2.dual.network"
   };
 }
 
@@ -35,6 +38,9 @@ export function readiness() {
     templateId: config.templateId || null,
     objectId: config.objectId || null,
     templateName,
+    consoleBaseUrl: config.consoleBaseUrl,
+    l3ExplorerBaseUrl: config.l3ExplorerBaseUrl,
+    l2ExplorerBaseUrl: config.l2ExplorerBaseUrl,
     readbackReady,
     writable,
     writeMode: config.writeMode,

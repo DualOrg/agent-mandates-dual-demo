@@ -4,6 +4,12 @@ const initialState = {
   lifecycleIndex: 1,
   selectedMode: "quote",
   selectedTab: "immutable",
+  selectedPathView: "policy",
+  proofBundle: {
+    generated: false,
+    hash: "",
+    at: ""
+  },
   lastDecision: {
     result: "Ready",
     reason: "Awaiting simulation",
@@ -75,9 +81,102 @@ const lifecycle = [
   ["Decommissioned", "Mandate revoked and locked"]
 ];
 
+const pathViews = {
+  policy: [
+    ["01", "Mandate issued", "Principal binds wallet, scope, and ceiling", "verified"],
+    ["02", "Request normalized", "Agent action becomes a typed proposal", "verified"],
+    ["03", "Policy checked", "Scope, status, jurisdiction, and limit evaluated", "active"],
+    ["04", "Decision logged", "Decision hash is returned for audit", "verified"]
+  ],
+  evidence: [
+    ["01", "Signature", "Principal delegation is attached", "verified"],
+    ["02", "Policy hash", "Mutable terms produce a stable hash", "verified"],
+    ["03", "DUAL readback", "Object and template prove canonical state", "active"],
+    ["04", "Explorer links", "Reviewer can open public anchors", "verified"]
+  ],
+  agent: [
+    ["01", "MCP client", "Agent calls read-only evaluator", "verified"],
+    ["02", "Authority gate", "Evaluator allows, blocks, or asks a human", "active"],
+    ["03", "No write power", "Public MCP exposes no sync or mint tool", "verified"],
+    ["04", "Audit handoff", "Object id and decision hash go into agent logs", "verified"]
+  ]
+};
+
+let reviewerMode = false;
+let reviewerStepIndex = 0;
+
 let state = loadState();
 
 const $ = (id) => document.getElementById(id);
+
+const reviewerSteps = [
+  {
+    targetId: "mandatePanel",
+    title: "Mandate state",
+    body: "Start with the live authority object: one principal, one delegated buyer agent, an active state, and a bounded spend ceiling.",
+    facts: () => [
+      ["Mandate", "agm-001"],
+      ["Status", state.mandate.state],
+      ["Limit", formatUsd(state.mandate.limitUsd)],
+      ["Jurisdiction", state.mandate.jurisdiction]
+    ]
+  },
+  {
+    targetId: "authorityPanel",
+    title: "Authority boundary",
+    body: "The useful claim is not that the agent is trusted. It is that the principal has set explicit, readable constraints before execution.",
+    facts: () => [
+      ["Principal", shortValue(state.mandate.principalWallet)],
+      ["Agent", shortValue(state.mandate.agentWallet)],
+      ["Scope", state.mandate.authorityScope],
+      ["Human gate", state.mandate.humanApproval ? "enabled" : "off"]
+    ]
+  },
+  {
+    targetId: "simulatorPanel",
+    title: "Agent action",
+    body: "The agent proposes a concrete action. Local simulation shows the operator what will pass, require approval, or block.",
+    facts: () => [
+      ["Request", state.request.label],
+      ["Amount", formatUsd(state.request.amount)],
+      ["Counterparty", state.request.counterparty],
+      ["Result", state.lastDecision.result]
+    ]
+  },
+  {
+    targetId: "verifierPanel",
+    title: "Read-only verifier",
+    body: "Agents can call the public evaluator and receive a decision hash without receiving any operator write token.",
+    facts: () => [
+      ["Decision", state.gate.result],
+      ["Source", state.gate.source],
+      ["Decision hash", shortHash(state.gate.decisionHash)],
+      ["Public writes", "false"]
+    ]
+  },
+  {
+    targetId: "proofRailPanel",
+    title: "DUAL proof rail",
+    body: "The proof rail exposes object, template, state hash, integrity hash, and explorer links so a reviewer can verify the backing record.",
+    facts: () => [
+      ["Object", shortValue(proofObjectId())],
+      ["Template", shortValue(proofTemplateId())],
+      ["Source", proofSourceLabel()],
+      ["Bundle", shortHash(state.proofBundle.hash)]
+    ]
+  },
+  {
+    targetId: "dualReadinessPanel",
+    title: "Write boundary",
+    body: "Readback is public. State-changing DUAL sync is operator-gated. Page load and public MCP calls do not write.",
+    facts: () => [
+      ["Runtime", `${state.dual.status?.runtime || "browser"} / ${state.dual.status?.mode || "local"}`],
+      ["Readback", state.dual.status?.readbackReady ? "configured" : "pending"],
+      ["Writable", state.dual.status?.writable ? "event-bus gated" : "disabled"],
+      ["Public writes", String(Boolean(state.dual.status?.publicWrites))]
+    ]
+  }
+];
 
 function loadState() {
   const stored = localStorage.getItem("dual-agent-mandates-state");
@@ -92,6 +191,7 @@ function loadState() {
       lastDecision: { ...structuredClone(initialState.lastDecision), ...(parsed.lastDecision || {}) },
       dual: { ...structuredClone(initialState.dual), ...(parsed.dual || {}) },
       gate: { ...structuredClone(initialState.gate), ...(parsed.gate || {}) },
+      proofBundle: { ...structuredClone(initialState.proofBundle), ...(parsed.proofBundle || {}) },
       audit: Array.isArray(parsed.audit) ? parsed.audit : structuredClone(initialState.audit)
     };
   } catch {
@@ -108,6 +208,13 @@ function saveState() {
 function shortHash(value) {
   if (!value) return "pending";
   return `${value.slice(0, 10)}...${value.slice(-8)}`;
+}
+
+function shortValue(value, head = 10, tail = 6) {
+  if (!value) return "pending";
+  const text = String(value);
+  if (text.length <= head + tail + 3) return text;
+  return `${text.slice(0, head)}...${text.slice(-tail)}`;
 }
 
 async function digest(input) {
@@ -254,20 +361,37 @@ async function render() {
   $("proofScore").textContent = String(Math.max(72, 100 - state.audit.filter((item) => item.type === "block").length * 9));
   $("stateChip").textContent = state.mandate.state.toUpperCase();
   $("lifecycleStatus").textContent = state.mandate.state;
-  $("lifecycleStatus").className = `status-dot ${state.mandate.state === "active" ? "active" : state.mandate.state === "revoked" ? "revoked" : ""}`;
+  $("lifecycleStatus").className = `status-chip ${state.mandate.state === "active" ? "active" : state.mandate.state === "revoked" ? "revoked" : "review"}`;
   $("legalStatus").textContent = state.mandate.legalVerified ? "Verified" : "Review";
-  $("legalStatus").className = `status-dot ${state.mandate.legalVerified ? "verified" : ""}`;
+  $("legalStatus").className = `status-chip ${state.mandate.legalVerified ? "verified" : "review"}`;
   $("jurisdictionText").textContent = `${state.mandate.jurisdiction} rules matched`;
   $("mandateHash").textContent = shortHash(state.mandate.mandateHash);
   $("policyHash").textContent = shortHash(state.mandate.policyHash);
   $("lastEventHash").textContent = shortHash(state.mandate.lastEventHash);
   $("auditCount").textContent = `${state.audit.length} events`;
+  $("headerScope").textContent = state.mandate.authorityScope;
+  $("headerObjectId").textContent = shortValue(proofObjectId());
+  $("headerPublicWrites").textContent = String(Boolean(state.dual.status?.publicWrites));
+  $("principalShort").textContent = shortValue(state.mandate.principalWallet);
+  $("agentShort").textContent = shortValue(state.mandate.agentWallet);
+  $("policyLimit").textContent = formatUsd(state.mandate.limitUsd);
+  $("policyJurisdiction").textContent = state.mandate.jurisdiction;
+  $("blockedCount").textContent = String(state.audit.filter((item) => item.type === "block").length);
+  $("remainingAllowance").textContent = formatUsd(Math.max(0, Number(state.mandate.limitUsd || 0) - Number(state.request.amount || 0)));
+  $("stateMachine").textContent = state.mandate.state === "revoked"
+    ? "Created -> Active -> Revoked -> Agent blocked"
+    : state.mandate.state === "suspended"
+      ? "Created -> Active -> Suspended -> Human review"
+      : "Created -> Active -> Evaluated -> Synced or blocked";
+  $("exportStatus").textContent = state.proofBundle.generated ? `${shortHash(state.proofBundle.hash)} at ${state.proofBundle.at}` : "Not generated";
 
   const lifecycleHtml = lifecycle.map(([name, desc], index) => {
     const className = index < state.lifecycleIndex ? "complete-step" : index === state.lifecycleIndex ? "active-step" : "";
     return `<li class="${className}"><div class="lifecycle-index">${index + 1}</div><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(desc)}</span></div></li>`;
   }).join("");
   $("lifecycleList").innerHTML = lifecycleHtml;
+
+  renderPathMap();
 
   const token = currentToken();
   $("schemaPanel").textContent = JSON.stringify(token[state.selectedTab], null, 2);
@@ -293,6 +417,22 @@ async function render() {
 
   renderDualStatus();
   renderGateStatus();
+  renderProofRail();
+  renderReviewerGuide();
+}
+
+function renderPathMap() {
+  const nodes = pathViews[state.selectedPathView] || pathViews.policy;
+  $("pathMap").innerHTML = nodes.map(([step, title, detail, tone]) => (
+    `<article class="path-node ${escapeHtml(tone)}">
+      <span>${escapeHtml(step)}</span>
+      <strong>${escapeHtml(title)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>`
+  )).join("");
+  document.querySelectorAll("[data-path-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.pathView === state.selectedPathView);
+  });
 }
 
 function renderDualStatus() {
@@ -302,24 +442,161 @@ function renderDualStatus() {
   const writeReady = Boolean(status.writable);
   const tone = state.dual.tone || (writeReady ? "active" : readReady ? "review" : "local");
 
-  $("dualStatusChip").textContent = writeReady ? "DUAL writable" : readReady ? "DUAL readback" : "DUAL local";
-  $("dualStatusChip").className = `status-dot ${writeReady ? "active" : readReady ? "verified" : ""}`;
-  $("dualMode").textContent = status.mode || "local";
-  $("dualReadiness").textContent = readReady ? "Ready" : "Not linked";
-  $("dualWriteReadiness").textContent = writeReady ? "Ready" : "Operator gated";
-  $("dualObjectId").textContent = current.id || status.objectId || "not linked";
+  $("dualModeChip").textContent = writeReady ? "Operator gated" : readReady ? "Read linked" : "Local";
+  $("dualModeChip").className = `status-chip ${writeReady ? "active" : readReady ? "verified" : "review"}`;
+  $("dualRuntime").textContent = `${status.runtime || "browser"} / ${status.mode || "local"}`;
+  $("dualOrg").textContent = shortValue(status.orgId || "pending", 12, 6);
+  $("dualReadiness").textContent = readReady ? "configured" : "not linked";
+  $("dualWriteReadiness").textContent = writeReady ? "event-bus gated" : "disabled";
   $("dualMessage").textContent = state.dual.message || initialState.dual.message;
-  $("dualMessage").className = `dual-message ${tone}`;
+  $("dualMessage").className = `readiness-note ${tone}`;
 }
 
 function renderGateStatus() {
   const tone = state.gate.tone || "local";
   $("gateSource").textContent = state.gate.source || "idle";
+  $("gateSource").className = `status-chip ${tone === "block" ? "blocked" : tone === "review" ? "review" : tone === "ready" ? "verified" : "review"}`;
   $("gateDecision").textContent = state.gate.result || "Not checked";
   $("gateReason").textContent = state.gate.reason || "No external action evaluated";
   $("gateDecisionHash").textContent = shortHash(state.gate.decisionHash);
   $("gateObjectId").textContent = state.gate.objectId || "not linked";
-  $("gateStrip").className = `decision-strip gate-strip ${tone === "block" ? "blocked" : tone === "review" ? "review" : ""}`;
+}
+
+function proofObjectId() {
+  return state.dual.current?.id || state.dual.status?.objectId || state.gate.objectId || "";
+}
+
+function proofTemplateId() {
+  return state.dual.current?.templateId || state.dual.status?.templateId || "";
+}
+
+function proofSourceLabel() {
+  if (state.dual.current?.id) return "dual_readback";
+  if (state.dual.status?.readbackReady) return "configured";
+  return "local_preview";
+}
+
+function currentRawObject() {
+  return state.dual.current?.raw || state.dual.current || {};
+}
+
+function explorerBase() {
+  return (state.dual.status?.l3ExplorerBaseUrl || "https://explorer-testnet.dual.network").replace(/\/+$/, "");
+}
+
+function l2ExplorerBase() {
+  return (state.dual.status?.l2ExplorerBaseUrl || "https://explorer-test-v2.dual.network").replace(/\/+$/, "");
+}
+
+function proofLinks() {
+  const raw = currentRawObject();
+  const objectId = proofObjectId();
+  const templateId = proofTemplateId();
+  const stateHash = raw.stateHash || raw.state_hash || state.dual.current?.stateHash || "";
+  const integrityHash = raw.integrityHash || raw.integrity_hash || state.dual.current?.integrityHash || "";
+  const bundleHash = state.proofBundle.hash || "";
+  const links = [];
+  if (objectId) {
+    links.push({
+      id: "dual-object",
+      label: "DUAL object block explorer",
+      value: objectId,
+      detail: "Object state",
+      href: `${explorerBase()}/objects/${encodeURIComponent(objectId)}`
+    });
+  }
+  if (templateId) {
+    links.push({
+      id: "dual-template",
+      label: "DUAL template block explorer",
+      value: templateId,
+      detail: "Template schema",
+      href: `${explorerBase()}/templates/${encodeURIComponent(templateId)}`
+    });
+  }
+  if (stateHash) {
+    links.push({
+      id: "state-hash",
+      label: "State hash proof",
+      value: stateHash,
+      detail: "Object state hash",
+      href: `${l2ExplorerBase()}/search?q=${encodeURIComponent(stateHash)}`
+    });
+  }
+  if (integrityHash) {
+    links.push({
+      id: "integrity-hash",
+      label: "Integrity hash proof",
+      value: integrityHash,
+      detail: "Object integrity hash",
+      href: `${l2ExplorerBase()}/search?q=${encodeURIComponent(integrityHash)}`
+    });
+  }
+  if (bundleHash) {
+    links.push({
+      id: "proof-bundle",
+      label: "Proof bundle hash",
+      value: bundleHash,
+      detail: "Locally re-derived reviewer bundle",
+      href: `${l2ExplorerBase()}/search?q=${encodeURIComponent(bundleHash)}`
+    });
+  }
+  return links;
+}
+
+function renderProofRail() {
+  const raw = currentRawObject();
+  const stateHash = raw.stateHash || raw.state_hash || state.dual.current?.stateHash || "";
+  const integrityHash = raw.integrityHash || raw.integrity_hash || state.dual.current?.integrityHash || "";
+  const readReady = Boolean(proofObjectId());
+  const writable = Boolean(state.dual.status?.writable);
+
+  $("proofModeChip").textContent = writable ? "Operator gated" : readReady ? "Read-only" : "Local";
+  $("proofModeChip").className = `status-chip ${writable ? "active" : readReady ? "verified" : "review"}`;
+  $("proofObjectId").textContent = shortValue(proofObjectId());
+  $("proofTemplateId").textContent = shortValue(proofTemplateId());
+  $("proofSource").textContent = proofSourceLabel();
+  $("stateHash").textContent = shortHash(stateHash);
+  $("integrityHash").textContent = shortHash(integrityHash);
+  $("bundleHash").textContent = state.proofBundle.generated ? shortHash(state.proofBundle.hash) : "not generated";
+  $("proofVerificationLevel").textContent = readReady ? "dual_readback_rederived" : "local_preview";
+  renderProofLinks(proofLinks());
+  renderPrimaryProofActions(proofLinks());
+}
+
+function renderProofLinks(links = []) {
+  if (!links.length) {
+    $("proofLinks").innerHTML = `<div class="proof-link-empty">DUAL block explorer links appear after readback.</div>`;
+    return;
+  }
+  $("proofLinks").innerHTML = links.slice(0, 6).map((link) => `
+    <a class="proof-link" href="${escapeHtml(link.href)}" target="_blank" rel="noreferrer">
+      <span>${escapeHtml(link.label)}</span>
+      <strong>${escapeHtml(shortHash(link.value))}</strong>
+      <small>${escapeHtml(link.detail)}</small>
+    </a>
+  `).join("");
+}
+
+function renderPrimaryProofActions(links = []) {
+  const objectLink = links.find((link) => link.id === "dual-object");
+  const templateLink = links.find((link) => link.id === "dual-template");
+  setProofAction("proofObjectAction", objectLink, "Open Object Proof");
+  setProofAction("proofTemplateAction", templateLink, "Open Template Proof");
+}
+
+function setProofAction(id, link, fallbackLabel) {
+  const element = $(id);
+  element.textContent = fallbackLabel;
+  if (link?.href) {
+    element.href = link.href;
+    element.classList.remove("disabled");
+    element.removeAttribute("aria-disabled");
+  } else {
+    element.removeAttribute("href");
+    element.classList.add("disabled");
+    element.setAttribute("aria-disabled", "true");
+  }
 }
 
 async function saveMandate() {
@@ -405,6 +682,41 @@ async function evaluateExternalGate() {
       tone: "block"
     };
   }
+  await render();
+}
+
+async function generateProofBundle() {
+  syncFromInputs();
+  await refreshHashes();
+  const raw = currentRawObject();
+  const bundle = {
+    type: "agent_mandate_reviewer_bundle",
+    generated_at: new Date().toISOString(),
+    mandate: mandateSnapshot(),
+    gate: state.gate,
+    dual: {
+      object_id: proofObjectId(),
+      template_id: proofTemplateId(),
+      state_hash: raw.stateHash || raw.state_hash || state.dual.current?.stateHash || "",
+      integrity_hash: raw.integrityHash || raw.integrity_hash || state.dual.current?.integrityHash || "",
+      source: proofSourceLabel(),
+      public_writes: Boolean(state.dual.status?.publicWrites)
+    },
+    hashes: {
+      mandate_hash: state.mandate.mandateHash,
+      policy_hash: state.mandate.policyHash,
+      last_event_hash: state.mandate.lastEventHash,
+      decision_hash: state.gate.decisionHash || ""
+    },
+    boundary: "Public users can read, simulate, evaluate, and verify. Live DUAL writes require the operator token."
+  };
+  const hash = await digest(JSON.stringify(bundle));
+  state.proofBundle = {
+    generated: true,
+    hash,
+    at: nowStamp()
+  };
+  addAudit("export", "Proof bundle generated", `Reviewer bundle ${shortHash(hash)} includes mandate, gate, DUAL readback, and write boundary.`);
   await render();
 }
 
@@ -533,11 +845,81 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function renderReviewerGuide() {
+  const guide = $("reviewerGuide");
+  document.querySelectorAll(".review-focus").forEach((element) => element.classList.remove("review-focus"));
+  if (!reviewerMode) {
+    guide.hidden = true;
+    $("reviewerModeBtn").classList.remove("active");
+    return;
+  }
+
+  const step = reviewerSteps[reviewerStepIndex] || reviewerSteps[0];
+  const target = $(step.targetId);
+  if (target) target.classList.add("review-focus");
+  guide.hidden = false;
+  $("reviewerModeBtn").classList.add("active");
+  $("reviewerEyebrow").textContent = `Step ${reviewerStepIndex + 1} of ${reviewerSteps.length}`;
+  $("reviewerTitle").textContent = step.title;
+  $("reviewerBody").textContent = step.body;
+  $("reviewerFacts").innerHTML = step.facts().map(([label, value]) => `
+    <div>
+      <dt>${escapeHtml(label)}</dt>
+      <dd>${escapeHtml(value || "pending")}</dd>
+    </div>
+  `).join("");
+  $("reviewerProgress").style.setProperty("--progress", `${((reviewerStepIndex + 1) / reviewerSteps.length) * 100}%`);
+  $("reviewerPrevBtn").disabled = reviewerStepIndex === 0;
+  $("reviewerNextBtn").textContent = reviewerStepIndex === reviewerSteps.length - 1 ? "Finish" : "Next";
+}
+
+function scrollReviewerTarget() {
+  const step = reviewerSteps[reviewerStepIndex] || reviewerSteps[0];
+  const target = $(step.targetId);
+  target?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function toggleReviewerMode() {
+  reviewerMode = !reviewerMode;
+  if (reviewerMode) reviewerStepIndex = 0;
+  await render();
+  if (reviewerMode) scrollReviewerTarget();
+}
+
+async function advanceReviewerStep() {
+  if (reviewerStepIndex >= reviewerSteps.length - 1) {
+    reviewerMode = false;
+    await render();
+    return;
+  }
+  reviewerStepIndex += 1;
+  await render();
+  scrollReviewerTarget();
+}
+
+async function retreatReviewerStep() {
+  reviewerStepIndex = Math.max(0, reviewerStepIndex - 1);
+  await render();
+  scrollReviewerTarget();
+}
+
+async function closeReviewerMode() {
+  reviewerMode = false;
+  await render();
+}
+
 function wireEvents() {
   $("saveMandateBtn").addEventListener("click", saveMandate);
   $("simulateBtn").addEventListener("click", () => simulateTransaction(false));
   $("forceBreachBtn").addEventListener("click", () => simulateTransaction(true));
   $("evaluateGateBtn").addEventListener("click", evaluateExternalGate);
+  $("verifyNextBtn").addEventListener("click", evaluateExternalGate);
+  $("proofBundleBtn").addEventListener("click", generateProofBundle);
+  $("proofRecomputeAction").addEventListener("click", generateProofBundle);
+  $("reviewerModeBtn").addEventListener("click", toggleReviewerMode);
+  $("reviewerPrevBtn").addEventListener("click", retreatReviewerStep);
+  $("reviewerNextBtn").addEventListener("click", advanceReviewerStep);
+  $("reviewerCloseBtn").addEventListener("click", closeReviewerMode);
   $("suspendBtn").addEventListener("click", suspendMandate);
   $("revokeBtn").addEventListener("click", revokeMandate);
   $("loadDualBtn").addEventListener("click", () => loadCurrentMandate({ applyToLocal: true }));
@@ -552,6 +934,13 @@ function wireEvents() {
   document.querySelectorAll(".segment").forEach((button) => {
     button.addEventListener("click", async () => {
       state.selectedMode = button.dataset.mode;
+      await render();
+    });
+  });
+
+  document.querySelectorAll("[data-path-view]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.selectedPathView = button.dataset.pathView;
       await render();
     });
   });

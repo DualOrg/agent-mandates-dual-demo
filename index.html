@@ -4,48 +4,110 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DUAL Agent Mandates</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260529-benchmark" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand-block">
-          <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" role="img">
-              <path d="M6.25 5.5h7.7c2.38 0 4.3 1.92 4.3 4.3v4.4c0 2.38-1.92 4.3-4.3 4.3h-7.7V5.5Z" />
-              <path d="M10 9.25h3.6c.82 0 1.48.66 1.48 1.48v2.54c0 .82-.66 1.48-1.48 1.48H10v-5.5Z" />
-            </svg>
+          <a class="brand-logo" href="/" aria-label="DUAL Agent Mandates">
+            <img src="./assets/dual-logo.svg" alt="DUAL" />
+          </a>
+          <div class="brand-copy">
+            <h1>Agent Mandates Control Desk</h1>
+            <p>Buyer-controlled agent authority with DUAL-backed proof.</p>
+          </div>
+        </div>
+        <div class="header-meta" aria-label="Demo state summary">
+          <div>
+            <span>Authority scope</span>
+            <strong id="headerScope">buyer-agent-commerce</strong>
           </div>
           <div>
-            <h1>DUAL Agent Mandates</h1>
-            <p>Token-embedded authority for autonomous agent commerce</p>
+            <span>Mandate object</span>
+            <strong id="headerObjectId">pending</strong>
+          </div>
+          <div>
+            <span>Public writes</span>
+            <strong id="headerPublicWrites">false</strong>
           </div>
         </div>
         <div class="topbar-actions">
-          <span class="status-dot" id="dualStatusChip">DUAL local</span>
           <button class="icon-btn" id="resetBtn" title="Reset demo state" aria-label="Reset demo state">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.2V3.9h3.3" /><path d="M5 7.1A8.2 8.2 0 1 1 3.8 14" /></svg>
+            <span class="mobile-action-label">Reset demo</span>
           </button>
-          <button class="primary-btn" id="saveMandateBtn">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.4 9.1 16.5 19 6.7" /></svg>
-            Save mandate
+          <button class="agent-btn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+            Buyer Agent
+          </button>
+          <button class="agent-btn" id="reviewerModeBtn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></svg>
+            Reviewer Mode
+          </button>
+          <button class="secondary-btn" id="proofBundleBtn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="m8 11 4 4 4-4" /><path d="M5 20h14" /></svg>
+            Generate proof bundle
+          </button>
+          <button class="primary-btn" id="verifyNextBtn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.4 17 19 7" /></svg>
+            Verify agent action
           </button>
         </div>
       </header>
 
+      <section class="demo-disclosure" aria-label="Demo disclosure">
+        <strong>Synthetic agent request, live DUAL proof.</strong>
+        <span>The wallet, spend, and counterparty names are demo data. The DUAL object, template, readback hashes, decision hash, MCP evaluator, and block explorer links are real testnet anchors.</span>
+      </section>
+
+      <section class="walkthrough-band" aria-label="Reviewer walkthrough">
+        <div>
+          <strong>60-90 second reviewer walkthrough</strong>
+          <span>Fast pass through principal authority, policy evaluation, public read-only MCP, operator-gated DUAL sync, and blocked-action evidence.</span>
+        </div>
+        <figure class="walkthrough-media">
+          <img src="./assets/agent-mandates-browser.png" alt="Agent Mandates proof cockpit preview" />
+        </figure>
+      </section>
+
       <main class="workspace">
-        <aside class="panel side-panel">
+        <aside class="panel left-panel">
+          <section class="panel-section" id="authorityPanel">
+            <div class="section-head">
+              <h2>Authority corridor</h2>
+              <span class="status-chip allowed" id="corridorStatus">Allowed</span>
+            </div>
+            <div class="route-card">
+              <div>
+                <span>Principal</span>
+                <strong id="principalShort">69b92d49...672003</strong>
+                <small>Buyer wallet and mandate owner</small>
+              </div>
+              <div class="route-line" aria-hidden="true"></div>
+              <div>
+                <span>Agent</span>
+                <strong id="agentShort">agent-wallet-001</strong>
+                <small>Autonomous buyer agent</small>
+              </div>
+            </div>
+            <div class="policy-summary">
+              <div><span>Limit</span><strong id="policyLimit">$250</strong></div>
+              <div><span>Jurisdiction</span><strong id="policyJurisdiction">AU-NSW</strong></div>
+            </div>
+          </section>
+
           <section class="panel-section">
             <div class="section-head">
               <h2>Lifecycle</h2>
-              <span class="status-dot" id="lifecycleStatus">Active</span>
+              <span class="status-chip" id="lifecycleStatus">Active</span>
             </div>
             <ol class="lifecycle" id="lifecycleList"></ol>
           </section>
 
           <section class="panel-section">
             <div class="section-head">
-              <h2>Mandate Controls</h2>
+              <h2>Mandate boundary</h2>
               <span class="small-metric" id="versionLabel">v1</span>
             </div>
             <label class="field">
@@ -84,12 +146,17 @@
               <input id="humanApproval" type="checkbox" checked />
               <span>Human approval above threshold</span>
             </label>
+            <button class="secondary-btn full-width" id="saveMandateBtn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.4 17 19 7" /></svg>
+              Save mandate boundary
+            </button>
           </section>
 
           <section class="panel-section">
             <div class="section-head">
-              <h2>Revocation</h2>
+              <h2>Revocation controls</h2>
             </div>
+            <p class="control-note">Suspension and revocation update local proof state immediately. Live DUAL writes still require operator sync.</p>
             <div class="button-grid">
               <button class="secondary-btn" id="suspendBtn">Suspend</button>
               <button class="danger-btn" id="revokeBtn">Revoke</button>
@@ -98,7 +165,7 @@
         </aside>
 
         <section class="center-stack">
-          <section class="panel mandate-panel">
+          <section class="panel mandate-panel" id="mandatePanel">
             <div class="mandate-header">
               <div>
                 <h2 id="mandateTitle">Agent Commerce Mandate</h2>
@@ -110,8 +177,7 @@
                 <small>proof score</small>
               </div>
             </div>
-
-            <div class="metrics-grid">
+            <div class="metric-grid">
               <div class="metric">
                 <span>Mandate ID</span>
                 <strong id="mandateId"></strong>
@@ -131,73 +197,84 @@
             </div>
           </section>
 
-          <section class="panel simulator-panel">
+          <section class="panel route-panel">
             <div class="section-head">
-              <h2>Agent Transaction Simulator</h2>
-              <div class="segmented" role="group" aria-label="Transaction mode">
-                <button class="segment active" data-mode="quote">Quote</button>
-                <button class="segment" data-mode="purchase">Purchase</button>
-                <button class="segment" data-mode="transfer">Transfer</button>
+              <h2>Mandate proof path</h2>
+              <div class="segmented" role="group" aria-label="Proof path view">
+                <button class="segment active" data-path-view="policy">Policy</button>
+                <button class="segment" data-path-view="evidence">Evidence</button>
+                <button class="segment" data-path-view="agent">Agent</button>
               </div>
             </div>
-            <div class="sim-grid">
-              <label class="field">
-                <span>Action request</span>
-                <input id="requestLabel" type="text" value="Buy verified inventory token" />
-              </label>
-              <label class="field">
-                <span>Amount USD</span>
-                <input id="requestAmount" type="number" value="175" min="1" step="25" />
-              </label>
-              <label class="field">
-                <span>Counterparty</span>
-                <input id="counterparty" type="text" value="verified-seller.dual" />
-              </label>
-            </div>
-            <div class="decision-strip" id="decisionStrip">
-              <div>
-                <span class="label">Policy result</span>
-                <strong id="policyResult">Ready</strong>
-              </div>
-              <div>
-                <span class="label">Reason</span>
-                <strong id="policyReason">Awaiting simulation</strong>
-              </div>
-              <div class="decision-actions">
-                <button class="primary-btn" id="simulateBtn">Simulate</button>
-                <button class="secondary-btn" id="forceBreachBtn">Force breach</button>
-              </div>
-            </div>
+            <div class="route-map" id="pathMap" aria-label="Agent mandate proof path"></div>
           </section>
 
-          <section class="panel gate-panel">
-            <div class="section-head">
-              <h2>External Action Gate</h2>
-              <span class="small-metric" id="gateSource">idle</span>
-            </div>
-            <div class="gate-grid">
-              <div><span>Object</span><code id="gateObjectId">not linked</code></div>
-              <div><span>Decision hash</span><code id="gateDecisionHash">pending</code></div>
-            </div>
-            <div class="decision-strip gate-strip" id="gateStrip">
-              <div>
-                <span class="label">Decision</span>
-                <strong id="gateDecision">Not checked</strong>
+          <section class="lower-grid">
+            <section class="panel simulator-panel" id="simulatorPanel">
+              <div class="section-head">
+                <h2>Agent action queue</h2>
+                <div class="segmented" role="group" aria-label="Transaction mode">
+                  <button class="segment active" data-mode="quote">Quote</button>
+                  <button class="segment" data-mode="purchase">Purchase</button>
+                  <button class="segment" data-mode="transfer">Transfer</button>
+                </div>
               </div>
-              <div>
-                <span class="label">Reason</span>
-                <strong id="gateReason">No external action evaluated</strong>
+              <div class="sim-grid">
+                <label class="field">
+                  <span>Action request</span>
+                  <input id="requestLabel" type="text" value="Buy verified inventory token" />
+                </label>
+                <label class="field">
+                  <span>Amount USD</span>
+                  <input id="requestAmount" type="number" value="175" min="1" step="25" />
+                </label>
+                <label class="field">
+                  <span>Counterparty</span>
+                  <input id="counterparty" type="text" value="verified-seller.dual" />
+                </label>
               </div>
-              <div class="decision-actions">
-                <button class="primary-btn" id="evaluateGateBtn">Evaluate</button>
+              <div class="decision-strip" id="decisionStrip">
+                <div>
+                  <span class="label">Policy result</span>
+                  <strong id="policyResult">Ready</strong>
+                </div>
+                <div>
+                  <span class="label">Reason</span>
+                  <strong id="policyReason">Awaiting simulation</strong>
+                </div>
+                <div class="decision-actions">
+                  <button class="primary-btn" id="simulateBtn">Simulate</button>
+                  <button class="danger-btn" id="forceBreachBtn">Preview breach</button>
+                </div>
               </div>
-            </div>
+            </section>
+
+            <section class="panel gate-panel" id="verifierPanel">
+              <div class="section-head">
+                <h2>Agent verifier</h2>
+                <span class="status-chip review" id="gateSource">idle</span>
+              </div>
+              <div class="verifier-card">
+                <div class="verifier-result">
+                  <div>
+                    <span>Decision</span>
+                    <strong id="gateDecision">Not checked</strong>
+                  </div>
+                  <button class="secondary-btn" id="evaluateGateBtn">Run evaluator</button>
+                </div>
+                <p id="gateReason">No external action evaluated</p>
+                <div class="proof-list compact">
+                  <div><span>Object</span><code id="gateObjectId">not linked</code></div>
+                  <div><span>Decision hash</span><code id="gateDecisionHash">pending</code></div>
+                </div>
+              </div>
+            </section>
           </section>
 
-          <section class="panel verification-panel">
+          <section class="panel verification-panel" id="legalPanel">
             <div class="section-head">
-              <h2>Legal Verification</h2>
-              <span class="status-dot verified" id="legalStatus">Verified</span>
+              <h2>Legal verification</h2>
+              <span class="status-chip verified" id="legalStatus">Verified</span>
             </div>
             <div class="verification-grid">
               <div class="check-row">
@@ -217,16 +294,30 @@
         </section>
 
         <aside class="panel right-panel">
-          <section class="panel-section dual-section">
+          <section class="panel-section" id="dualReadinessPanel">
             <div class="section-head">
-              <h2>DUAL Backing</h2>
-              <span class="small-metric" id="dualMode">local</span>
+              <h2>DUAL readiness</h2>
+              <span class="status-chip review" id="dualModeChip">Checking</span>
             </div>
-            <div class="dual-grid">
-              <div><span>Readback</span><strong id="dualReadiness">Checking</strong></div>
-              <div><span>Writes</span><strong id="dualWriteReadiness">Operator gated</strong></div>
-              <div><span>Object</span><code id="dualObjectId">not linked</code></div>
+            <div class="readiness-grid">
+              <div>
+                <span>Runtime</span>
+                <strong id="dualRuntime">checking</strong>
+              </div>
+              <div>
+                <span>Org</span>
+                <strong id="dualOrg">pending</strong>
+              </div>
+              <div>
+                <span>Readback</span>
+                <strong id="dualReadiness">pending</strong>
+              </div>
+              <div>
+                <span>Writable</span>
+                <strong id="dualWriteReadiness">operator gated</strong>
+              </div>
             </div>
+            <p class="readiness-note" id="dualMessage">Checking DUAL status endpoint...</p>
             <div class="operator-row">
               <label class="field">
                 <span>Operator token</span>
@@ -237,12 +328,50 @@
                 <button class="primary-btn" id="syncDualBtn">Sync</button>
               </div>
             </div>
-            <p class="dual-message" id="dualMessage">Public simulation is local. DUAL writes require an operator token.</p>
+          </section>
+
+          <section class="panel-section" id="proofRailPanel">
+            <div class="section-head">
+              <h2>Proof rail</h2>
+              <span class="status-chip review" id="proofModeChip">Read-only</span>
+            </div>
+            <div class="proof-object-strip">
+              <div>
+                <span>Object</span>
+                <strong id="proofObjectId">pending</strong>
+              </div>
+              <div>
+                <span>Template</span>
+                <strong id="proofTemplateId">pending</strong>
+              </div>
+              <div>
+                <span>Source</span>
+                <strong id="proofSource">pending</strong>
+              </div>
+            </div>
+            <div class="proof-actions" aria-label="Primary proof explorer actions">
+              <a class="proof-action disabled" id="proofObjectAction" aria-disabled="true">Open Object Proof</a>
+              <a class="proof-action disabled" id="proofTemplateAction" aria-disabled="true">Open Template Proof</a>
+              <button class="proof-action" id="proofRecomputeAction" type="button">Recompute Proof</button>
+            </div>
+            <div class="proof-list">
+              <div><span>Mandate hash</span><code id="mandateHash"></code></div>
+              <div><span>Policy hash</span><code id="policyHash"></code></div>
+              <div><span>Last event hash</span><code id="lastEventHash"></code></div>
+              <div><span>DUAL state hash</span><code id="stateHash">pending</code></div>
+              <div><span>DUAL integrity hash</span><code id="integrityHash">pending</code></div>
+              <div><span>Proof bundle</span><code id="bundleHash">not generated</code></div>
+              <div><span>Verifier level</span><code id="proofVerificationLevel">readback pending</code></div>
+            </div>
+            <div class="proof-links-head">
+              <span>DUAL block explorer links</span>
+            </div>
+            <div class="proof-links" id="proofLinks"></div>
           </section>
 
           <section class="panel-section">
             <div class="section-head">
-              <h2>Live Token Object</h2>
+              <h2>DUAL token object</h2>
               <span class="small-metric" id="tokenVersion">nonce 1</span>
             </div>
             <div class="schema-tabs" role="tablist" aria-label="Token schema">
@@ -253,27 +382,52 @@
             <pre class="code-panel" id="schemaPanel"></pre>
           </section>
 
-          <section class="panel-section">
-            <div class="section-head">
-              <h2>Proof Evidence</h2>
-            </div>
-            <div class="proof-list">
-              <div><span>Mandate hash</span><code id="mandateHash"></code></div>
-              <div><span>Policy hash</span><code id="policyHash"></code></div>
-              <div><span>Last event</span><code id="lastEventHash"></code></div>
-            </div>
-          </section>
-
           <section class="panel-section audit-section">
             <div class="section-head">
-              <h2>Audit Log</h2>
+              <h2>Audit log</h2>
               <span class="small-metric" id="auditCount">0</span>
             </div>
             <div class="audit-log" id="auditLog"></div>
           </section>
         </aside>
       </main>
+
+      <footer class="settlement-bar">
+        <div>
+          <span>State machine</span>
+          <strong id="stateMachine">Created -> Active -> Evaluated -> Synced or blocked</strong>
+        </div>
+        <div>
+          <span>Blocked actions</span>
+          <strong id="blockedCount">0</strong>
+        </div>
+        <div>
+          <span>Remaining allowance</span>
+          <strong id="remainingAllowance">$250</strong>
+        </div>
+        <div>
+          <span>Proof bundle</span>
+          <strong id="exportStatus">Not generated</strong>
+        </div>
+      </footer>
+
+      <section class="reviewer-guide" id="reviewerGuide" aria-live="polite" hidden>
+        <div class="reviewer-progress" id="reviewerProgress"></div>
+        <div>
+          <span id="reviewerEyebrow">Reviewer mode</span>
+          <h2 id="reviewerTitle">Agent mandate proof walkthrough</h2>
+          <p id="reviewerBody">Follow the proof path from principal authority to DUAL readback.</p>
+          <dl class="reviewer-facts" id="reviewerFacts"></dl>
+        </div>
+        <div class="reviewer-actions">
+          <button class="secondary-btn" id="reviewerPrevBtn">Back</button>
+          <button class="primary-btn" id="reviewerNextBtn">Next</button>
+          <button class="icon-btn" id="reviewerCloseBtn" title="Close reviewer mode" aria-label="Close reviewer mode">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </div>
+      </section>
     </div>
-    <script src="./client.js"></script>
+    <script src="./client.js?v=20260529-benchmark"></script>
   </body>
 </html>
