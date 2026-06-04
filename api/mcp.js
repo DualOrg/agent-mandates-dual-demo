@@ -79,6 +79,7 @@ export default async function handler(request, response) {
   }
 
   if (request.method === "GET") {
+    const status = readiness();
     response.status(200).json({
       ok: true,
       endpoint: "/mcp",
@@ -88,7 +89,8 @@ export default async function handler(request, response) {
       safety: {
         readOnly: true,
         publicWrites: false,
-        operatorWritesExposed: false
+        operatorWritesExposed: false,
+        networkMigration: status.network
       },
       tools: tools.map((item) => item.name),
       resources: resources.map((item) => item.uri)
@@ -131,6 +133,7 @@ export default async function handler(request, response) {
 
 async function handleMethod(method, params) {
   if (method === "initialize") {
+    const status = readiness();
     return {
       protocolVersion,
       capabilities: {
@@ -143,6 +146,12 @@ async function handleMethod(method, params) {
         required: false,
         type: "none",
         detail: "This MCP exposes read-only mandate status, readback, and action evaluation. It does not expose operator-gated DUAL writes."
+      },
+      safety: {
+        readOnly: true,
+        publicWrites: false,
+        operatorWritesExposed: false,
+        networkMigration: status.network
       },
       instructions: "Use agent_mandates_evaluate_action before consequential autonomous action. Treat Approved as allowed, Blocked as deny-before-execution, and Requires approval as a human escalation."
     };
@@ -159,13 +168,15 @@ async function handleMethod(method, params) {
 async function callTool(name, args) {
   switch (name) {
     case "agent_mandates_get_status":
+      const status = readiness();
       return {
         ok: true,
-        status: readiness(),
+        status,
         safety: {
           readOnly: true,
           publicWrites: false,
-          operatorWritesExposed: false
+          operatorWritesExposed: false,
+          networkMigration: status.network
         }
       };
     case "agent_mandates_get_current":
@@ -217,13 +228,15 @@ async function safeCurrentMandate() {
 
 async function readResource(uri) {
   if (uri === "agent-mandates://status") {
+    const status = readiness();
     return resourceContent(uri, {
       ok: true,
-      status: readiness(),
+      status,
       safety: {
         readOnly: true,
         publicWrites: false,
-        operatorWritesExposed: false
+        operatorWritesExposed: false,
+        networkMigration: status.network
       }
     });
   }

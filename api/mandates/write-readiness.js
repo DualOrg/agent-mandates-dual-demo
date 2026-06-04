@@ -13,11 +13,14 @@ export default function handler(request, response) {
   const hasObject = Boolean(config.objectId);
   const hasOperatorGate = Boolean(config.operatorToken);
   const eventBusMode = config.writeMode === "event_bus";
+  const networkWriteAllowed = Boolean(status.network?.write_allowed);
 
   response.status(200).json({
     ok: true,
     mode: config.mode,
     runtime: status.runtime,
+    targetNetwork: status.targetNetwork,
+    network: status.network,
     orgId: config.orgId,
     templateId: config.templateId || null,
     objectId: config.objectId || null,
@@ -29,8 +32,8 @@ export default function handler(request, response) {
     write: {
       enabled: status.writable,
       mode: config.writeMode,
-      syncReady: Boolean(hasApiKey && hasTemplate && hasObject && hasOperatorGate && eventBusMode),
-      mintReady: Boolean(hasApiKey && hasTemplate && hasOperatorGate && eventBusMode),
+      syncReady: Boolean(networkWriteAllowed && hasApiKey && hasTemplate && hasObject && hasOperatorGate && eventBusMode),
+      mintReady: Boolean(networkWriteAllowed && hasApiKey && hasTemplate && hasOperatorGate && eventBusMode),
       operatorGateConfigured: hasOperatorGate,
       publicWrites: false,
       exposedThroughMcp: false
