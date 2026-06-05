@@ -501,11 +501,17 @@ function currentRawObject() {
 }
 
 function explorerBase() {
-  return (state.dual.status?.l3ExplorerBaseUrl || "https://explorer-testnet.dual.network").replace(/\/+$/, "");
+  const fallback = state.dual.status?.targetNetwork === "mainnet"
+    ? "https://explorer.dual.network"
+    : "https://explorer-testnet.dual.network";
+  return (state.dual.status?.l3ExplorerBaseUrl || fallback).replace(/\/+$/, "");
 }
 
 function l2ExplorerBase() {
-  return (state.dual.status?.l2ExplorerBaseUrl || "https://explorer-test-v2.dual.network").replace(/\/+$/, "");
+  const fallback = state.dual.status?.targetNetwork === "mainnet"
+    ? "https://blockscout.dual.network"
+    : "https://explorer-test-v2.dual.network";
+  return (state.dual.status?.l2ExplorerBaseUrl || fallback).replace(/\/+$/, "");
 }
 
 function proofLinks() {

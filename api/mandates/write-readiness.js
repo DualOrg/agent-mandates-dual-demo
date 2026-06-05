@@ -13,7 +13,24 @@ export default function handler(request, response) {
   const hasObject = Boolean(config.objectId);
   const hasOperatorGate = Boolean(config.operatorToken);
   const eventBusMode = config.writeMode === "event_bus";
+  const networkReadAllowed = Boolean(status.network?.read_allowed);
   const networkWriteAllowed = Boolean(status.network?.write_allowed);
+  const mainnetRequirements = status.network?.mainnet_requested
+    ? [
+        {
+          name: "AGENT_MANDATES_MAINNET_READONLY_CONFIRMED=true",
+          configured: Boolean(status.network?.mainnet_readonly_confirmed),
+          scope: "server",
+          requiredFor: "mainnet readback"
+        },
+        {
+          name: "AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true",
+          configured: Boolean(status.network?.mainnet_cutover_confirmed),
+          scope: "server",
+          requiredFor: "mainnet writes"
+        }
+      ]
+    : [];
 
   response.status(200).json({
     ok: true,
@@ -27,6 +44,7 @@ export default function handler(request, response) {
     read: {
       enabled: status.readbackReady,
       source: status.readbackReady ? "dual_object_readback" : "local_preview",
+      networkAllowed: networkReadAllowed,
       missing: status.readbackReady ? [] : status.missing.filter((item) => item !== "DUAL_AGENT_MANDATE_TEMPLATE_ID")
     },
     write: {
@@ -39,6 +57,7 @@ export default function handler(request, response) {
       exposedThroughMcp: false
     },
     requirements: [
+      ...mainnetRequirements,
       { name: "DUAL_API_KEY", configured: hasApiKey, scope: "server" },
       { name: "DUAL_AGENT_MANDATE_TEMPLATE_ID", configured: hasTemplate, scope: "server" },
       { name: "DUAL_AGENT_MANDATE_OBJECT_ID", configured: hasObject, scope: "server", requiredFor: "sync" },

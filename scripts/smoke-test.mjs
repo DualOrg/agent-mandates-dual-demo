@@ -1,4 +1,5 @@
 const baseUrl = process.env.DEMO_BASE_URL || "http://127.0.0.1:4173";
+const mainnetOrgId = "6a1a927534603174374c8ecf";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -48,7 +49,10 @@ const status = await request("/api/dual/status");
 assert(status.response.ok, "status endpoint returns 200");
 assert(status.body.publicWrites === false, "status endpoint reports no public writes");
 assert(!("apiKey" in status.body), "status endpoint does not expose API key");
-assert(status.body.orgId === "69b935b4187e903f826bbe71", "status endpoint defaults to IanTest org");
+assert(typeof status.body.orgId === "string" && status.body.orgId.length > 0, "status endpoint reports an org id");
+if (status.body.targetNetwork === "mainnet") {
+  assert(status.body.orgId === mainnetOrgId, "status endpoint uses the DUAL mainnet org in mainnet mode");
+}
 
 const current = await request("/api/mandates/current");
 assert(current.response.ok, "current mandate endpoint degrades safely");

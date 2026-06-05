@@ -37,11 +37,16 @@ For DUAL-backed readback in production:
 
 ```text
 DUAL_PERSISTENCE_MODE=dual
-DUAL_API_URL=https://api-testnet.dual.network
-DUAL_ORG_ID=69b935b4187e903f826bbe71
-DUAL_AGENT_MANDATE_TEMPLATE_ID=6a165a580b0bf21f33c111ca
-DUAL_AGENT_MANDATE_OBJECT_ID=6a165a5a0b0bf21f33c111cc
-DUAL_API_KEY=...
+DUAL_NETWORK=mainnet
+AGENT_MANDATES_MAINNET_READONLY_CONFIRMED=true
+DUAL_API_URL=https://api.dual.network/
+DUAL_CONSOLE_BASE_URL=https://console.dual.network/
+DUAL_L3_EXPLORER_BASE_URL=https://explorer.dual.network/
+DUAL_L2_EXPLORER_BASE_URL=https://blockscout.dual.network/
+DUAL_ORG_ID=6a1a927534603174374c8ecf
+DUAL_AGENT_MANDATE_TEMPLATE_ID=
+DUAL_AGENT_MANDATE_OBJECT_ID=
+DUAL_API_KEY=
 DUAL_WRITE_MODE=read_only
 ```
 
@@ -49,27 +54,28 @@ For operator-gated event-bus writes:
 
 ```text
 DUAL_WRITE_MODE=event_bus
+AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true
 DEMO_OPERATOR_TOKEN=...
 ```
 
 Optional link bases:
 
 ```text
-DUAL_CONSOLE_BASE_URL=https://console-testnet.dual.network
-DUAL_L3_EXPLORER_BASE_URL=https://explorer-testnet.dual.network
-DUAL_L2_EXPLORER_BASE_URL=https://explorer-test-v2.dual.network
+DUAL_CONSOLE_BASE_URL=https://console.dual.network/
+DUAL_L3_EXPLORER_BASE_URL=https://explorer.dual.network/
+DUAL_L2_EXPLORER_BASE_URL=https://blockscout.dual.network/
 ```
 
 Do not store `DUAL_API_KEY` or `DEMO_OPERATOR_TOKEN` in client code, docs, screenshots, logs, DUAL objects, or commits.
 
 ## DUAL-Backed Deployment
 
-The production demo currently targets IanTest:
+The production demo should target DUAL mainnet once the template/object mapping exists:
 
 ```text
-DUAL_ORG_ID=69b935b4187e903f826bbe71
-DUAL_AGENT_MANDATE_TEMPLATE_ID=6a165a580b0bf21f33c111ca
-DUAL_AGENT_MANDATE_OBJECT_ID=6a165a5a0b0bf21f33c111cc
+DUAL_ORG_ID=6a1a927534603174374c8ecf
+DUAL_AGENT_MANDATE_TEMPLATE_ID=<mainnet template id>
+DUAL_AGENT_MANDATE_OBJECT_ID=<mainnet object id>
 ```
 
 Template name:
@@ -112,9 +118,9 @@ It exposes status, current mandate readback, and evaluation only. It does not ex
 
 1. Deploy local-safe code with `DUAL_PERSISTENCE_MODE=local`.
 2. Confirm `npm run check`, local smoke, and local MCP harness.
-3. Configure production readback env vars.
+3. Configure production mainnet read-only env vars from `.env.mainnet.readonly.example`.
 4. Deploy and verify `GET /api/dual/status`.
-5. Confirm `publicWrites=false` and `operatorGateConfigured=true` if write mode is configured.
+5. Confirm `targetNetwork=mainnet`, `publicWrites=false`, and `writable=false` unless an operator write has been explicitly approved.
 6. Verify `GET /api/mandates/current` returns the canonical object or a clear readiness message.
 7. Verify `GET /api/mandates/write-readiness` reports read/write capability without secrets.
 8. Verify `POST /api/mandates/evaluate` returns a decision hash without writing.

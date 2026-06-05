@@ -163,17 +163,22 @@ Use this for local UI work, policy changes, documentation review, and screenshot
 
 ### DUAL-Backed Readback Mode
 
-DUAL-backed readback links the app to the canonical mandate object in IanTest.
+DUAL-backed readback links the app to the canonical mandate object on the configured DUAL network. Production should use the mainnet read-only profile until the Agent Mandates mainnet template and object have been created.
 
-Minimum server-side configuration:
+Minimum server-side mainnet read-only configuration:
 
 ```bash
 DUAL_PERSISTENCE_MODE=dual
-DUAL_API_URL=https://api-testnet.dual.network
-DUAL_ORG_ID=69b935b4187e903f826bbe71
-DUAL_AGENT_MANDATE_TEMPLATE_ID=6a165a580b0bf21f33c111ca
-DUAL_AGENT_MANDATE_OBJECT_ID=6a165a5a0b0bf21f33c111cc
-DUAL_API_KEY=...
+DUAL_NETWORK=mainnet
+AGENT_MANDATES_MAINNET_READONLY_CONFIRMED=true
+DUAL_API_URL=https://api.dual.network/
+DUAL_CONSOLE_BASE_URL=https://console.dual.network/
+DUAL_L3_EXPLORER_BASE_URL=https://explorer.dual.network/
+DUAL_L2_EXPLORER_BASE_URL=https://blockscout.dual.network/
+DUAL_ORG_ID=6a1a927534603174374c8ecf
+DUAL_AGENT_MANDATE_TEMPLATE_ID=
+DUAL_AGENT_MANDATE_OBJECT_ID=
+DUAL_API_KEY=
 DUAL_WRITE_MODE=read_only
 ```
 
@@ -187,6 +192,7 @@ Additional configuration:
 
 ```bash
 DUAL_WRITE_MODE=event_bus
+AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true
 DEMO_OPERATOR_TOKEN=...
 ```
 
@@ -199,16 +205,17 @@ Important:
 
 ## DUAL Setup Checklist
 
-1. Use IanTest org `69b935b4187e903f826bbe71`.
-2. Create or confirm the template named `io.dual.agent_mandate.demo.v1`.
-3. Seed one canonical demo mandate object.
+1. Use mainnet org `6a1a927534603174374c8ecf`.
+2. Create or confirm the mainnet template named `io.dual.agent_mandate.demo.v1`.
+3. Seed one canonical mainnet demo mandate object.
 4. Set `DUAL_AGENT_MANDATE_TEMPLATE_ID`.
 5. Set `DUAL_AGENT_MANDATE_OBJECT_ID`.
 6. Set a scoped server-side `DUAL_API_KEY`.
 7. Set `DUAL_WRITE_MODE=read_only` for public readback-only deployments.
-8. Set `DUAL_WRITE_MODE=event_bus` only when operator-gated sync is intended.
-9. Set `DEMO_OPERATOR_TOKEN` only in server-side environment variables.
-10. Verify:
+8. Set `AGENT_MANDATES_MAINNET_READONLY_CONFIRMED=true` for mainnet readback.
+9. Set `DUAL_WRITE_MODE=event_bus` and `AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true` only when an app-specific operator write has been approved.
+10. Set `DEMO_OPERATOR_TOKEN` only in server-side environment variables.
+11. Verify:
     - `GET /api/dual/status`
     - `GET /api/mandates/current`
     - `GET /api/mandates/write-readiness`
@@ -339,11 +346,11 @@ Every evaluation returns proof metadata:
 
 The app keeps human-facing DUAL links and proof/search links where the public route can support them:
 
-- Console org: `https://console-testnet.dual.network/{orgId}`
-- Console template: `https://console-testnet.dual.network/{orgId}/collections/templates?templateId={templateId}`
-- Console object: `https://console-testnet.dual.network/{orgId}/collections/objects?objectId={objectId}`
-- L3 action explorer base: `https://explorer-testnet.dual.network`
-- L2 explorer base: `https://explorer-test-v2.dual.network`
+- Console org: `https://console.dual.network/{orgId}`
+- Console template: `https://console.dual.network/{orgId}/collections/templates?templateId={templateId}`
+- Console object: `https://console.dual.network/{orgId}/collections/objects?objectId={objectId}`
+- L3 action explorer base: `https://explorer.dual.network`
+- L2 explorer base: `https://blockscout.dual.network`
 
 The current public v1 proof rail is readback and verifier focused. It does not claim an L1 roll-up transaction for every evaluation. Operator-gated sync events may create DUAL event-bus action evidence; public evaluation does not write.
 
@@ -383,6 +390,7 @@ The sync and mint routes require a browser confirmation and a valid `DEMO_OPERAT
 | Port `4173` is busy | Another local server is running. | Start with `PORT=4174 npm start`. |
 | UI shows local mode | `DUAL_PERSISTENCE_MODE=local` or missing DUAL readback credentials. | Configure DUAL env vars only when live readback is needed. |
 | `/api/dual/status` says readback is missing | Missing `DUAL_API_KEY` or `DUAL_AGENT_MANDATE_OBJECT_ID`. | Set server-side env vars and redeploy. |
+| `/api/dual/status` says mainnet network config is blocked | Mainnet was requested without explicit production endpoints or read-only confirmation. | Use `.env.mainnet.readonly.example` and keep writes disabled. |
 | Preview works but sync fails | Preview is read-only; execution still needs write readiness and operator token. | Check `/api/mandates/write-readiness`. |
 | Operator sync returns `403` | Missing or wrong `x-demo-operator-token` / bearer token. | Use the server-side configured operator token only for approved sync. |
 | Operator sync returns `409` | Write mode, template id, object id, API key, or operator token is incomplete. | Check `/api/dual/status` and `DUAL_WRITE_MODE=event_bus`. |

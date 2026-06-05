@@ -1,23 +1,30 @@
 import { createHash } from "node:crypto";
 
 export const defaultOrgId = "69b935b4187e903f826bbe71";
+export const mainnetOrgId = "6a1a927534603174374c8ecf";
 export const templateName = "io.dual.agent_mandate.demo.v1";
 export const DEFAULT_DUAL_API_URL = "https://api-testnet.dual.network";
 export const DEFAULT_DUAL_CONSOLE_BASE_URL = "https://console-testnet.dual.network";
 export const DEFAULT_DUAL_L3_EXPLORER_BASE_URL = "https://explorer-testnet.dual.network";
 export const DEFAULT_DUAL_L2_EXPLORER_BASE_URL = "https://explorer-test-v2.dual.network";
+export const MAINNET_DUAL_API_URL = "https://api.dual.network/";
+export const MAINNET_DUAL_CONSOLE_BASE_URL = "https://console.dual.network/";
+export const MAINNET_DUAL_L3_EXPLORER_BASE_URL = "https://explorer.dual.network/";
+export const MAINNET_DUAL_L2_EXPLORER_BASE_URL = "https://blockscout.dual.network/";
+const MAINNET_READONLY_FLAG = "AGENT_MANDATES_MAINNET_READONLY_CONFIRMED";
 const MAINNET_CUTOVER_FLAG = "AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED";
 
 export function dualConfig(env = process.env) {
   const mode = env.DUAL_PERSISTENCE_MODE || "local";
   const writeMode = env.DUAL_WRITE_MODE || "read_only";
   const requestedNetwork = normalizeDualNetwork(env.DUAL_NETWORK || env.AGENT_MANDATES_DUAL_NETWORK || "");
+  const orgId = env.DUAL_ORG_ID || (requestedNetwork === "mainnet" ? mainnetOrgId : defaultOrgId);
   return {
     mode,
     writeMode,
     requestedNetwork,
     apiUrl: env.DUAL_API_URL || DEFAULT_DUAL_API_URL,
-    orgId: env.DUAL_ORG_ID || defaultOrgId,
+    orgId,
     templateId: env.DUAL_AGENT_MANDATE_TEMPLATE_ID || "",
     objectId: env.DUAL_AGENT_MANDATE_OBJECT_ID || "",
     apiKey: env.DUAL_API_KEY || "",
@@ -30,7 +37,10 @@ export function dualConfig(env = process.env) {
 
 export function networkMigrationPreflight(config = dualConfig(), env = process.env) {
   const mainnetRequested = config.requestedNetwork === "mainnet";
+  const mainnetReadOnlyConfirmed = boolEnv(env[MAINNET_READONLY_FLAG]) || boolEnv(env.DUAL_MAINNET_READONLY_CONFIRMED);
   const mainnetCutoverConfirmed = boolEnv(env[MAINNET_CUTOVER_FLAG]) || boolEnv(env.DUAL_MAINNET_CUTOVER_CONFIRMED);
+  const readOnlyConfirmed = mainnetReadOnlyConfirmed || mainnetCutoverConfirmed;
+  const writeIntent = config.writeMode === "event_bus";
   const endpointSpecs = [
     ["DUAL_API_URL", config.apiUrl, Boolean(env.DUAL_API_URL), "mainnet_api_base"],
     ["DUAL_CONSOLE_BASE_URL", config.consoleBaseUrl, Boolean(env.DUAL_CONSOLE_BASE_URL), "mainnet_console_base"],
@@ -47,23 +57,35 @@ export function networkMigrationPreflight(config = dualConfig(), env = process.e
       mainnetLabel
     };
   });
-  const missing = [];
+  const readMissing = [];
+  const writeMissing = [];
   if (mainnetRequested) {
-    if (!mainnetCutoverConfirmed) missing.push(`${MAINNET_CUTOVER_FLAG}=true`);
+    if (!readOnlyConfirmed) readMissing.push(`${MAINNET_READONLY_FLAG}=true`);
+    if (!env.DUAL_ORG_ID) readMissing.push("DUAL_ORG_ID=mainnet_org_id");
     for (const endpoint of endpoints) {
-      if (!endpoint.explicit) missing.push(`${endpoint.key}=${endpoint.mainnetLabel}`);
-      if (endpoint.blocks_mainnet) missing.push(`${endpoint.key}_not_testnet_or_legacy`);
+      if (!endpoint.explicit) readMissing.push(`${endpoint.key}=${endpoint.mainnetLabel}`);
+      if (endpoint.blocks_mainnet) readMissing.push(`${endpoint.key}_not_testnet_or_legacy`);
     }
+    if (!mainnetCutoverConfirmed) writeMissing.push(`${MAINNET_CUTOVER_FLAG}=true`);
   }
+  const missing = unique([...readMissing, ...(writeIntent ? writeMissing : [])]);
+  const readAllowed = !mainnetRequested || readMissing.length === 0;
+  const writeAllowed = !mainnetRequested || (readAllowed && mainnetCutoverConfirmed && writeMissing.length === 0);
   const ready = missing.length === 0;
   return {
     ready,
-    status: ready ? "network_config_ready" : "mainnet_network_config_blocked",
+    status: ready
+      ? "network_config_ready"
+      : readAllowed && writeIntent
+        ? "mainnet_write_config_blocked"
+        : "mainnet_network_config_blocked",
     target_network: config.requestedNetwork || "testnet",
     mainnet_requested: mainnetRequested,
+    mainnet_readonly_confirmed: readOnlyConfirmed,
     mainnet_cutover_confirmed: mainnetCutoverConfirmed,
-    read_allowed: !mainnetRequested || ready,
-    write_allowed: !mainnetRequested || ready,
+    write_intent: writeIntent,
+    read_allowed: readAllowed,
+    write_allowed: writeAllowed,
     api_url_kind: endpoints[0].kind,
     console_url_kind: endpoints[1].kind,
     l3_explorer_url_kind: endpoints[2].kind,
@@ -74,11 +96,15 @@ export function networkMigrationPreflight(config = dualConfig(), env = process.e
     using_default_l2_explorer_url: !endpoints[3].explicit,
     testnet_or_legacy_endpoint_count: endpoints.filter((endpoint) => endpoint.blocks_mainnet).length,
     missing,
+    read_missing: readMissing,
+    write_missing: writeMissing,
     endpoints: endpoints.map(({ mainnetLabel: _mainnetLabel, ...endpoint }) => endpoint),
     public_writes: false,
     secret_returned: false,
-    note: mainnetRequested && !ready
-      ? "DUAL mainnet mode is blocked until explicit non-testnet API/console/explorer config and cutover confirmation are configured."
+    note: mainnetRequested && !readAllowed
+      ? "DUAL mainnet mode is blocked until explicit non-testnet API/console/explorer config and read-only confirmation are configured."
+      : mainnetRequested && !writeAllowed
+        ? "DUAL mainnet read-only network config passed. Operator-gated writes remain blocked until cutover confirmation is configured."
       : "DUAL network config passed the local preflight. This does not prove DUAL readback or live-write readiness."
   };
 }
@@ -92,6 +118,7 @@ export function readiness() {
   if (!config.objectId) missing.push("DUAL_AGENT_MANDATE_OBJECT_ID");
   const readbackReady = Boolean(networkPreflight.read_allowed && config.apiKey && config.objectId);
   const writable = Boolean(networkPreflight.write_allowed && readbackReady && config.templateId && config.operatorToken && config.writeMode === "event_bus");
+  const mainnetMappingPending = Boolean(networkPreflight.mainnet_requested && (!config.templateId || !config.objectId));
   return {
     ok: readbackReady,
     mode: config.mode,
@@ -111,14 +138,19 @@ export function readiness() {
     writeMode: config.writeMode,
     operatorGateConfigured: Boolean(config.operatorToken),
     publicWrites: false,
+    mainnetMappingPending,
     missing,
     detail: writable
       ? "DUAL readback and operator-gated writes are configured."
       : readbackReady
-        ? "DUAL readback is configured. Operator-gated writes need event_bus mode and DEMO_OPERATOR_TOKEN."
+        ? networkPreflight.write_allowed
+          ? "DUAL readback is configured. Operator-gated writes need event_bus mode and DEMO_OPERATOR_TOKEN."
+          : "DUAL mainnet readback is configured. Operator-gated writes remain blocked until mainnet cutover confirmation is configured."
         : networkPreflight.read_allowed
-          ? "Set DUAL_API_KEY and DUAL_AGENT_MANDATE_OBJECT_ID to enable DUAL readback."
-          : "DUAL mainnet mode is blocked until explicit non-testnet API/console/explorer config and cutover confirmation are configured."
+          ? networkPreflight.mainnet_requested
+            ? "DUAL mainnet endpoint profile is configured. Set DUAL_API_KEY and DUAL_AGENT_MANDATE_OBJECT_ID after the mainnet template/object mapping exists to enable readback."
+            : "Set DUAL_API_KEY and DUAL_AGENT_MANDATE_OBJECT_ID to enable DUAL readback."
+          : "DUAL mainnet mode is blocked until explicit non-testnet API/console/explorer config and read-only confirmation are configured."
   };
 }
 
@@ -523,7 +555,12 @@ function boolEnv(value) {
 
 function endpointKind(value) {
   const normalized = String(value || "").trim().toLowerCase();
+  const normalizedBase = normalized.replace(/\/+$/, "");
   if (!normalized) return "empty";
+  if (normalizedBase === "https://api.dual.network") return "mainnet_api";
+  if (normalizedBase === "https://console.dual.network") return "mainnet_console";
+  if (normalizedBase === "https://explorer.dual.network") return "mainnet_l3_explorer";
+  if (normalizedBase === "https://blockscout.dual.network") return "mainnet_l2_explorer";
   if (normalized.includes("api-testnet.dual.network")) return "testnet_api";
   if (normalized.includes("mcp-testnet.dual.network")) return "testnet_mcp";
   if (normalized.includes("console-testnet.dual.network") || normalized.includes("console-testnet.blockv.io")) return "testnet_console";
@@ -535,11 +572,16 @@ function endpointKind(value) {
 }
 
 function endpointIsTestnetOrLegacy(value) {
-  return endpointKind(value) !== "custom";
+  const kind = endpointKind(value);
+  return kind === "empty" || kind.startsWith("testnet_") || kind === "legacy_gateway";
 }
 
 function firstNonEmpty(...values) {
   return values.find((value) => value !== undefined && value !== null && value !== "") || null;
+}
+
+function unique(values) {
+  return [...new Set(values)];
 }
 
 function scopeAllowsAction(scope, actionType, label = "") {

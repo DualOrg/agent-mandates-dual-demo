@@ -8,6 +8,8 @@ import {
 const ENV_KEYS = [
   "DUAL_NETWORK",
   "AGENT_MANDATES_DUAL_NETWORK",
+  "AGENT_MANDATES_MAINNET_READONLY_CONFIRMED",
+  "DUAL_MAINNET_READONLY_CONFIRMED",
   "AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED",
   "DUAL_MAINNET_CUTOVER_CONFIRMED",
   "DUAL_API_URL",
@@ -22,6 +24,14 @@ const ENV_KEYS = [
   "DUAL_PERSISTENCE_MODE",
   "DEMO_OPERATOR_TOKEN"
 ];
+
+const MAINNET_ENDPOINTS = {
+  DUAL_API_URL: "https://api.dual.network/",
+  DUAL_CONSOLE_BASE_URL: "https://console.dual.network/",
+  DUAL_L3_EXPLORER_BASE_URL: "https://explorer.dual.network/",
+  DUAL_L2_EXPLORER_BASE_URL: "https://blockscout.dual.network/",
+  DUAL_ORG_ID: "6a1a927534603174374c8ecf"
+};
 
 function withEnv(overrides, fn) {
   const snapshot = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
@@ -53,6 +63,7 @@ checks.push(runCheck("default_testnet_mode_is_not_a_mainnet_claim", () => withEn
   assert.equal(preflight.ready, true);
   assert.equal(preflight.target_network, "testnet");
   assert.equal(preflight.mainnet_requested, false);
+  assert.equal(preflight.mainnet_readonly_confirmed, false);
   assert.equal(preflight.api_url_kind, "testnet_api");
   assert.equal(preflight.console_url_kind, "testnet_console");
   assert.equal(preflight.l3_explorer_url_kind, "testnet_l3_explorer");
@@ -83,6 +94,7 @@ checks.push(runCheck("mainnet_mode_with_default_testnet_endpoints_fails_closed",
   assert.equal(status.readbackReady, false);
   assert.equal(status.writable, false);
   assert.equal(status.publicWrites, false);
+  assert(preflight.missing.includes("AGENT_MANDATES_MAINNET_READONLY_CONFIRMED=true"));
   assert(preflight.missing.includes("AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true"));
   assert(preflight.missing.includes("DUAL_API_URL=mainnet_api_base"));
   assert(preflight.missing.includes("DUAL_CONSOLE_BASE_URL=mainnet_console_base"));
@@ -91,13 +103,68 @@ checks.push(runCheck("mainnet_mode_with_default_testnet_endpoints_fails_closed",
   return { preflight, readiness: status };
 })));
 
-checks.push(runCheck("mainnet_mode_with_explicit_non_testnet_endpoints_passes_preflight_only", () => withEnv({
+checks.push(runCheck("mainnet_readonly_profile_passes_readonly_preflight_without_write_cutover", () => withEnv({
+  DUAL_NETWORK: "mainnet",
+  AGENT_MANDATES_MAINNET_READONLY_CONFIRMED: "true",
+  DUAL_WRITE_MODE: "read_only",
+  DUAL_PERSISTENCE_MODE: "dual",
+  ...MAINNET_ENDPOINTS
+}, () => {
+  const config = dualConfig();
+  const preflight = networkMigrationPreflight(config);
+  const status = readiness();
+  assert.equal(preflight.ready, true);
+  assert.equal(preflight.mainnet_requested, true);
+  assert.equal(preflight.mainnet_readonly_confirmed, true);
+  assert.equal(preflight.mainnet_cutover_confirmed, false);
+  assert.equal(preflight.read_allowed, true);
+  assert.equal(preflight.write_allowed, false);
+  assert.equal(preflight.api_url_kind, "mainnet_api");
+  assert.equal(preflight.console_url_kind, "mainnet_console");
+  assert.equal(preflight.l3_explorer_url_kind, "mainnet_l3_explorer");
+  assert.equal(preflight.l2_explorer_url_kind, "mainnet_l2_explorer");
+  assert.equal(status.readbackReady, false);
+  assert.equal(status.writable, false);
+  assert(status.missing.includes("DUAL_API_KEY"));
+  assert(!status.missing.includes("AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true"));
+  assert.equal(status.mainnetMappingPending, true);
+  return { preflight, readiness: status };
+})));
+
+checks.push(runCheck("mainnet_write_mode_without_cutover_keeps_writes_blocked", () => withEnv({
+  DUAL_NETWORK: "mainnet",
+  AGENT_MANDATES_MAINNET_READONLY_CONFIRMED: "true",
+  DUAL_API_KEY: "dummy-key",
+  DUAL_AGENT_MANDATE_TEMPLATE_ID: "dummy-template",
+  DUAL_AGENT_MANDATE_OBJECT_ID: "dummy-object",
+  DEMO_OPERATOR_TOKEN: "dummy-token",
+  DUAL_WRITE_MODE: "event_bus",
+  DUAL_PERSISTENCE_MODE: "dual",
+  ...MAINNET_ENDPOINTS
+}, () => {
+  const config = dualConfig();
+  const preflight = networkMigrationPreflight(config);
+  const status = readiness();
+  assert.equal(preflight.ready, false);
+  assert.equal(preflight.mainnet_requested, true);
+  assert.equal(preflight.read_allowed, true);
+  assert.equal(preflight.write_allowed, false);
+  assert.equal(status.readbackReady, true);
+  assert.equal(status.writable, false);
+  assert(preflight.missing.includes("AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED=true"));
+  return { preflight, readiness: status };
+})));
+
+checks.push(runCheck("mainnet_cutover_profile_allows_write_preflight_only", () => withEnv({
   DUAL_NETWORK: "mainnet",
   AGENT_MANDATES_MAINNET_CUTOVER_CONFIRMED: "true",
-  DUAL_API_URL: "https://agent-mandates-mainnet-api.example.invalid",
-  DUAL_CONSOLE_BASE_URL: "https://agent-mandates-mainnet-console.example.invalid",
-  DUAL_L3_EXPLORER_BASE_URL: "https://agent-mandates-mainnet-l3.example.invalid",
-  DUAL_L2_EXPLORER_BASE_URL: "https://agent-mandates-mainnet-l2.example.invalid"
+  DUAL_API_KEY: "dummy-key",
+  DUAL_AGENT_MANDATE_TEMPLATE_ID: "dummy-template",
+  DUAL_AGENT_MANDATE_OBJECT_ID: "dummy-object",
+  DEMO_OPERATOR_TOKEN: "dummy-token",
+  DUAL_WRITE_MODE: "event_bus",
+  DUAL_PERSISTENCE_MODE: "dual",
+  ...MAINNET_ENDPOINTS
 }, () => {
   const config = dualConfig();
   const preflight = networkMigrationPreflight(config);
@@ -106,13 +173,11 @@ checks.push(runCheck("mainnet_mode_with_explicit_non_testnet_endpoints_passes_pr
   assert.equal(preflight.mainnet_requested, true);
   assert.equal(preflight.read_allowed, true);
   assert.equal(preflight.write_allowed, true);
-  assert.equal(preflight.api_url_kind, "custom");
-  assert.equal(preflight.console_url_kind, "custom");
-  assert.equal(preflight.l3_explorer_url_kind, "custom");
-  assert.equal(preflight.l2_explorer_url_kind, "custom");
-  assert.equal(status.readbackReady, false);
-  assert.equal(status.writable, false);
-  assert(status.missing.includes("DUAL_API_KEY"));
+  assert.equal(preflight.mainnet_readonly_confirmed, true);
+  assert.equal(preflight.mainnet_cutover_confirmed, true);
+  assert.equal(status.readbackReady, true);
+  assert.equal(status.writable, true);
+  assert.equal(status.publicWrites, false);
   return { preflight, readiness: status };
 })));
 
